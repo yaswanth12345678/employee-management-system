@@ -1,0 +1,56 @@
+# Enterprise EMS — full stack via Docker Compose.
+#   docker compose up --build
+#   → client  http://localhost:8080
+#   → API     http://localhost:4000/api/v1
+#   → docs    http://localhost:4000/api/docs
+# The server auto-migrates + seeds (admin@ems.local / Admin@12345) on start.
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ems
+    ports:
+      - '5432:5432'
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d ems']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  server:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    environment:
+      NODE_ENV: production
+      PORT: '4000'
+      DATABASE_URL: postgres://postgres:postgres@db:5432/ems
+      JWT_ACCESS_SECRET: change-me-access-secret-min-16-chars
+      JWT_REFRESH_SECRET: change-me-refresh-secret-min-16-chars
+      BCRYPT_ROUNDS: '12'
+      CORS_ORIGIN: http://localhost:8080
+      PUBLIC_URL: http://localhost:4000
+      LOG_LEVEL: info
+    ports:
+      - '4000:4000'
+    depends_on:
+      db:
+        condition: service_healthy
+
+  client:
+    build:
+      context: .
+      dockerfile: client/Dockerfile
+      args:
+        VITE_API_URL: http://localhost:4000/api/v1
+    ports:
+      - '8080:80'
+    depends_on:
+      - server
+
+volumes:
+  dbdata:

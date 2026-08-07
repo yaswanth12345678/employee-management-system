@@ -1,0 +1,32 @@
+{
+  "name": "employee-project-mgmt",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Enterprise Employee & Project Management System (monorepo)",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build:shared": "npm --prefix shared run build",
+    "dev:server": "npm --prefix server run dev",
+    "dev:client": "npm --prefix client run dev",
+    "dev": "concurrently -n server,client -c blue,green \"npm:dev:server\" \"npm:dev:client\"",
+    "build": "npm --prefix shared run build && npm --prefix server run build && npm --prefix client run build",
+    "migrate": "npm --prefix server run migrate",
+    "seed":"npm --prefix server run seed",
+    "typecheck": "npm --prefix server run typecheck && npm --prefix client run typecheck",
+    "test": "npm --prefix server run test && npm --prefix client run test",
+    "lint": "eslint .",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "concurrently": "^9.1.0",
+    "eslint": "^9.17.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.18.0"
+  }
+}

@@ -1,0 +1,642 @@
+openapi: 3.0.3
+info:
+  title: Enterprise Employee & Project Management System API
+  version: 0.1.0
+  description: >
+    REST API for the EMS. All responses use an envelope: success is `{ data }` (plus
+    `{ meta.pagination }` for lists), errors are `{ error: { code, message, details? } }`.
+    Authenticate with a Bearer access token; the refresh token is an httpOnly cookie.
+servers:
+  - url: http://localhost:4000/api/v1
+    description: Local
+tags:
+  - name: Auth
+  - name: Departments
+  - name: Employees
+  - name: Projects
+  - name: Tasks
+  - name: Leave
+  - name: Attendance
+  - name: Notifications
+  - name: Reports
+  - name: Profile
+  - name: Settings
+  - name: Dashboard
+  - name: Health
+
+security:
+  - bearerAuth: []
+
+paths:
+  /health:
+    get:
+      tags: [Health]
+      security: []
+      summary: Liveness probe
+      responses:
+        '200': { description: OK }
+  /health/ready:
+    get:
+      tags: [Health]
+      security: []
+      summary: Readiness probe (checks DB)
+      responses:
+        '200': { description: Ready }
+        '503': { description: DB unreachable }
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      security: []
+      summary: Log in (rate limited)
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/LoginRequest' } } }
+      responses:
+        '200':
+          description: Access token + user; sets refresh cookie
+          content: { application/json: { schema: { $ref: '#/components/schemas/LoginResponseEnvelope' } } }
+        '401': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      security: [{ cookieAuth: [] }]
+      summary: Exchange the refresh cookie for a new access token
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/LoginResponseEnvelope' } } } }
+        '401': { $ref: '#/components/responses/Error' }
+  /auth/logout:
+    post:
+      tags: [Auth]
+      security: []
+      summary: Log out (revokes refresh tokens, clears cookie)
+      responses:
+        '204': { description: No Content }
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Current authenticated user
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/AuthUserEnvelope' } } } }
+        '401': { $ref: '#/components/responses/Error' }
+  /auth/forgot-password:
+    post:
+      tags: [Auth]
+      security: []
+      summary: Request a password reset (always 200; dev returns the token)
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [email], properties: { email: { type: string, format: email } } } } }
+      responses:
+        '200': { description: OK }
+  /auth/reset-password:
+    post:
+      tags: [Auth]
+      security: []
+      summary: Reset password using a token
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [token, newPassword], properties: { token: { type: string }, newPassword: { type: string, minLength: 8 } } } } }
+      responses:
+        '204': { description: No Content }
+        '400': { $ref: '#/components/responses/Error' }
+
+  /departments:
+    get:
+      tags: [Departments]
+      summary: List departments
+      parameters:
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/Limit' }
+        - { $ref: '#/components/parameters/Sort' }
+        - { $ref: '#/components/parameters/Search' }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/DepartmentListEnvelope' } } } }
+    post:
+      tags: [Departments]
+      summary: Create a department (admin, hr)
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreateDepartmentRequest' } } } }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/DepartmentEnvelope' } } } }
+        '400': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /departments/{id}:
+    parameters: [{ $ref: '#/components/parameters/Id' }]
+    get:
+      tags: [Departments]
+      summary: Get a department
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/DepartmentEnvelope' } } } }
+        '404': { $ref: '#/components/responses/Error' }
+    patch:
+      tags: [Departments]
+      summary: Update a department (admin, hr)
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreateDepartmentRequest' } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/DepartmentEnvelope' } } } }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Departments]
+      summary: Delete a department (admin)
+      responses:
+        '204': { description: No Content }
+        '409': { $ref: '#/components/responses/Error' }
+
+  /employees:
+    get:
+      tags: [Employees]
+      summary: List employees
+      parameters:
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/Limit' }
+        - { $ref: '#/components/parameters/Sort' }
+        - { $ref: '#/components/parameters/Search' }
+        - { in: query, name: departmentId, schema: { type: string, format: uuid } }
+        - { in: query, name: status, schema: { $ref: '#/components/schemas/EmploymentStatus' } }
+        - { in: query, name: managerId, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/EmployeeListEnvelope' } } } }
+    post:
+      tags: [Employees]
+      summary: Create user + employee (admin, hr; only admin may grant admin/hr)
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreateEmployeeRequest' } } } }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/EmployeeEnvelope' } } } }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /employees/{id}:
+    parameters: [{ $ref: '#/components/parameters/Id' }]
+    get:
+      tags: [Employees]
+      summary: Get an employee
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/EmployeeEnvelope' } } } }
+        '404': { $ref: '#/components/responses/Error' }
+    patch:
+      tags: [Employees]
+      summary: Update an employee (admin, hr)
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/UpdateEmployeeRequest' } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/EmployeeEnvelope' } } } }
+    delete:
+      tags: [Employees]
+      summary: Delete an employee (admin)
+      responses:
+        '204': { description: No Content }
+        '409': { $ref: '#/components/responses/Error' }
+
+  /projects:
+    get:
+      tags: [Projects]
+      summary: List projects
+      parameters:
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/Limit' }
+        - { $ref: '#/components/parameters/Sort' }
+        - { $ref: '#/components/parameters/Search' }
+        - { in: query, name: status, schema: { $ref: '#/components/schemas/ProjectStatus' } }
+        - { in: query, name: priority, schema: { $ref: '#/components/schemas/PriorityLevel' } }
+        - { in: query, name: departmentId, schema: { type: string, format: uuid } }
+        - { in: query, name: managerId, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/ProjectListEnvelope' } } } }
+    post:
+      tags: [Projects]
+      summary: Create a project (admin, manager)
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreateProjectRequest' } } } }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/ProjectEnvelope' } } } }
+        '400': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /projects/{id}:
+    parameters: [{ $ref: '#/components/parameters/Id' }]
+    get:
+      tags: [Projects]
+      summary: Get a project
+      responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/ProjectEnvelope' } } } }, '404': { $ref: '#/components/responses/Error' } }
+    patch:
+      tags: [Projects]
+      summary: Update a project (admin, manager)
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreateProjectRequest' } } } }
+      responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/ProjectEnvelope' } } } } }
+    delete:
+      tags: [Projects]
+      summary: Delete a project + its tasks (admin, manager)
+      responses: { '204': { description: No Content } }
+  /projects/{id}/members:
+    parameters: [{ $ref: '#/components/parameters/Id' }]
+    get:
+      tags: [Projects]
+      summary: List project members
+      responses: { '200': { description: OK } }
+    post:
+      tags: [Projects]
+      summary: Add a member (admin, manager)
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [employeeId], properties: { employeeId: { type: string, format: uuid }, roleOnProject: { type: string } } } } } }
+      responses: { '201': { description: Created }, '409': { $ref: '#/components/responses/Error' } }
+  /projects/{id}/members/{employeeId}:
+    parameters:
+      - { $ref: '#/components/parameters/Id' }
+      - { in: path, name: employeeId, required: true, schema: { type: string, format: uuid } }
+    delete:
+      tags: [Projects]
+      summary: Remove a member (admin, manager)
+      responses: { '204': { description: No Content } }
+
+  /tasks:
+    get:
+      tags: [Tasks]
+      summary: List tasks
+      parameters:
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/Limit' }
+        - { $ref: '#/components/parameters/Sort' }
+        - { $ref: '#/components/parameters/Search' }
+        - { in: query, name: projectId, schema: { type: string, format: uuid } }
+        - { in: query, name: assigneeId, schema: { type: string, format: uuid } }
+        - { in: query, name: status, schema: { $ref: '#/components/schemas/TaskStatus' } }
+        - { in: query, name: priority, schema: { $ref: '#/components/schemas/PriorityLevel' } }
+      responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/TaskListEnvelope' } } } } }
+    post:
+      tags: [Tasks]
+      summary: Create a task (admin, manager)
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreateTaskRequest' } } } }
+      responses: { '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/TaskEnvelope' } } } }, '400': { $ref: '#/components/responses/Error' } }
+  /tasks/{id}:
+    parameters: [{ $ref: '#/components/parameters/Id' }]
+    get: { tags: [Tasks], summary: Get a task, responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/TaskEnvelope' } } } }, '404': { $ref: '#/components/responses/Error' } } }
+    patch:
+      tags: [Tasks]
+      summary: Update a task (admin, manager)
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreateTaskRequest' } } } }
+      responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/TaskEnvelope' } } } } }
+    delete: { tags: [Tasks], summary: Delete a task (admin, manager), responses: { '204': { description: No Content } } }
+  /tasks/{id}/status:
+    parameters: [{ $ref: '#/components/parameters/Id' }]
+    patch:
+      tags: [Tasks]
+      summary: Change status (admin/manager or assignee/reporter)
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [status], properties: { status: { $ref: '#/components/schemas/TaskStatus' } } } } } }
+      responses: { '200': { description: OK }, '403': { $ref: '#/components/responses/Error' } }
+  /tasks/{id}/comments:
+    parameters: [{ $ref: '#/components/parameters/Id' }]
+    get: { tags: [Tasks], summary: List comments, responses: { '200': { description: OK } } }
+    post:
+      tags: [Tasks]
+      summary: Add a comment
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [body], properties: { body: { type: string } } } } } }
+      responses: { '201': { description: Created } }
+  /tasks/{id}/comments/{commentId}:
+    parameters:
+      - { $ref: '#/components/parameters/Id' }
+      - { in: path, name: commentId, required: true, schema: { type: string, format: uuid } }
+    patch: { tags: [Tasks], summary: Edit a comment (author or admin), responses: { '200': { description: OK }, '403': { $ref: '#/components/responses/Error' } } }
+    delete: { tags: [Tasks], summary: Delete a comment (author or admin), responses: { '204': { description: No Content } } }
+
+  /leave-requests:
+    get:
+      tags: [Leave]
+      summary: List leave requests (own for employees, all for admin/hr/manager)
+      parameters:
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/Limit' }
+        - { in: query, name: status, schema: { $ref: '#/components/schemas/LeaveStatus' } }
+        - { in: query, name: type, schema: { $ref: '#/components/schemas/LeaveType' } }
+      responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/LeaveListEnvelope' } } } } }
+    post:
+      tags: [Leave]
+      summary: Apply for leave
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CreateLeaveRequest' } } } }
+      responses: { '201': { description: Created }, '400': { $ref: '#/components/responses/Error' } }
+  /leave-requests/{id}/approve:
+    parameters: [{ $ref: '#/components/parameters/Id' }]
+    patch: { tags: [Leave], summary: Approve (admin/hr/manager, not self), responses: { '200': { description: OK }, '403': { $ref: '#/components/responses/Error' }, '409': { $ref: '#/components/responses/Error' } } }
+  /leave-requests/{id}/reject:
+    parameters: [{ $ref: '#/components/parameters/Id' }]
+    patch: { tags: [Leave], summary: Reject (admin/hr/manager, not self), responses: { '200': { description: OK }, '403': { $ref: '#/components/responses/Error' } } }
+  /leave-requests/{id}/cancel:
+    parameters: [{ $ref: '#/components/parameters/Id' }]
+    patch: { tags: [Leave], summary: Cancel own pending request, responses: { '200': { description: OK }, '403': { $ref: '#/components/responses/Error' } } }
+
+  /attendance/check-in:
+    post:
+      tags: [Attendance]
+      summary: Check in (once per day)
+      requestBody: { content: { application/json: { schema: { type: object, properties: { status: { $ref: '#/components/schemas/AttendanceStatus' }, notes: { type: string } } } } } }
+      responses: { '201': { description: Created }, '409': { $ref: '#/components/responses/Error' } }
+  /attendance/check-out:
+    post: { tags: [Attendance], summary: Check out, responses: { '200': { description: OK }, '409': { $ref: '#/components/responses/Error' } } }
+  /attendance/today:
+    get: { tags: [Attendance], summary: Today's record, responses: { '200': { description: OK } } }
+  /attendance/me:
+    get:
+      tags: [Attendance]
+      summary: My records
+      parameters:
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/Limit' }
+      responses: { '200': { description: OK } }
+  /attendance:
+    get: { tags: [Attendance], summary: All records (admin/hr/manager), responses: { '200': { description: OK } } }
+
+  /notifications:
+    get:
+      tags: [Notifications]
+      summary: My notifications
+      parameters:
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/Limit' }
+        - { in: query, name: unreadOnly, schema: { type: boolean } }
+      responses: { '200': { description: OK } }
+  /notifications/unread-count:
+    get: { tags: [Notifications], summary: Unread count, responses: { '200': { description: OK } } }
+  /notifications/read-all:
+    patch: { tags: [Notifications], summary: Mark all read, responses: { '204': { description: No Content } } }
+  /notifications/{id}/read:
+    parameters: [{ $ref: '#/components/parameters/Id' }]
+    patch: { tags: [Notifications], summary: Mark one read, responses: { '204': { description: No Content } } }
+  /notifications/{id}:
+    parameters: [{ $ref: '#/components/parameters/Id' }]
+    delete: { tags: [Notifications], summary: Dismiss, responses: { '204': { description: No Content } } }
+
+  /reports/attendance-summary:
+    get: { tags: [Reports], summary: Attendance counts (admin/hr/manager), parameters: [{ in: query, name: from, schema: { type: string } }, { in: query, name: to, schema: { type: string } }], responses: { '200': { description: OK } } }
+  /reports/leave-summary:
+    get: { tags: [Reports], summary: Leave counts, responses: { '200': { description: OK } } }
+  /reports/project-status:
+    get: { tags: [Reports], summary: Projects by status, responses: { '200': { description: OK } } }
+  /reports/headcount:
+    get: { tags: [Reports], summary: Headcount, responses: { '200': { description: OK } } }
+
+  /profile:
+    get: { tags: [Profile], summary: My profile, responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/EmployeeEnvelope' } } } } } }
+    patch:
+      tags: [Profile]
+      summary: Update own profile
+      requestBody: { content: { application/json: { schema: { type: object, properties: { phone: { type: string }, dateOfBirth: { type: string }, avatarUrl: { type: string } } } } } }
+      responses: { '200': { description: OK } }
+  /profile/password:
+    patch:
+      tags: [Profile]
+      summary: Change own password
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [currentPassword, newPassword], properties: { currentPassword: { type: string }, newPassword: { type: string, minLength: 8 } } } } } }
+      responses: { '204': { description: No Content }, '400': { $ref: '#/components/responses/Error' } }
+  /profile/avatar:
+    post:
+      tags: [Profile]
+      summary: Upload avatar image (multipart)
+      requestBody: { required: true, content: { multipart/form-data: { schema: { type: object, properties: { avatar: { type: string, format: binary } } } } } }
+      responses: { '200': { description: OK }, '400': { $ref: '#/components/responses/Error' } }
+
+  /settings:
+    get: { tags: [Settings], summary: My settings, responses: { '200': { description: OK } } }
+    patch:
+      tags: [Settings]
+      summary: Update settings
+      requestBody: { content: { application/json: { schema: { $ref: '#/components/schemas/UserSettings' } } } }
+      responses: { '200': { description: OK } }
+
+  /dashboard/summary:
+    get: { tags: [Dashboard], summary: Role-aware dashboard aggregation, responses: { '200': { description: OK } } }
+
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+    cookieAuth: { type: apiKey, in: cookie, name: refresh_token }
+  parameters:
+    Id: { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+    Page: { in: query, name: page, schema: { type: integer, minimum: 1, default: 1 } }
+    Limit: { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+    Sort: { in: query, name: sort, schema: { type: string }, description: 'field:asc|desc' }
+    Search: { in: query, name: search, schema: { type: string } }
+  responses:
+    Error:
+      description: Error envelope
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code: { type: string, enum: [VALIDATION_ERROR, UNAUTHENTICATED, FORBIDDEN, NOT_FOUND, CONFLICT, RATE_LIMITED, INTERNAL] }
+            message: { type: string }
+            details:
+              type: array
+              items: { type: object, properties: { field: { type: string }, message: { type: string } } }
+    PaginationMeta:
+      type: object
+      properties: { page: { type: integer }, limit: { type: integer }, total: { type: integer }, totalPages: { type: integer } }
+    RoleName: { type: string, enum: [admin, hr, manager, employee] }
+    EmploymentStatus: { type: string, enum: [probation, active, on_leave, terminated] }
+    ProjectStatus: { type: string, enum: [planning, active, on_hold, completed, cancelled] }
+    TaskStatus: { type: string, enum: [todo, in_progress, in_review, blocked, done] }
+    PriorityLevel: { type: string, enum: [low, medium, high, critical] }
+    AttendanceStatus: { type: string, enum: [present, absent, late, half_day, remote] }
+    LeaveType: { type: string, enum: [annual, sick, casual, unpaid, maternity, paternity] }
+    LeaveStatus: { type: string, enum: [pending, approved, rejected, cancelled] }
+    EmployeeSummary:
+      type: object
+      properties: { id: { type: string }, employeeCode: { type: string }, firstName: { type: string }, lastName: { type: string }, jobTitle: { type: string }, avatarUrl: { type: string } }
+    DepartmentSummary:
+      type: object
+      properties: { id: { type: string }, name: { type: string } }
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties: { email: { type: string, format: email }, password: { type: string } }
+    AuthUser:
+      type: object
+      properties:
+        id: { type: string }
+        email: { type: string }
+        role: { $ref: '#/components/schemas/RoleName' }
+        isActive: { type: boolean }
+        employee: { nullable: true, allOf: [{ $ref: '#/components/schemas/EmployeeSummary' }] }
+    AuthUserEnvelope:
+      type: object
+      properties: { data: { $ref: '#/components/schemas/AuthUser' } }
+    LoginResponseEnvelope:
+      type: object
+      properties:
+        data:
+          type: object
+          properties: { accessToken: { type: string }, user: { $ref: '#/components/schemas/AuthUser' } }
+    DepartmentDTO:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        description: { type: string }
+        head: { nullable: true, allOf: [{ $ref: '#/components/schemas/EmployeeSummary' }] }
+        employeeCount: { type: integer }
+        createdAt: { type: string }
+        updatedAt: { type: string }
+    DepartmentEnvelope: { type: object, properties: { data: { $ref: '#/components/schemas/DepartmentDTO' } } }
+    DepartmentListEnvelope:
+      type: object
+      properties:
+        data: { type: array, items: { $ref: '#/components/schemas/DepartmentDTO' } }
+        meta: { type: object, properties: { pagination: { $ref: '#/components/schemas/PaginationMeta' } } }
+    CreateDepartmentRequest:
+      type: object
+      required: [name]
+      properties: { name: { type: string }, description: { type: string }, headId: { type: string, nullable: true } }
+    EmployeeDTO:
+      allOf:
+        - { $ref: '#/components/schemas/EmployeeSummary' }
+        - type: object
+          properties:
+            email: { type: string }
+            role: { $ref: '#/components/schemas/RoleName' }
+            status: { $ref: '#/components/schemas/EmploymentStatus' }
+            phone: { type: string }
+            hireDate: { type: string }
+            dateOfBirth: { type: string }
+            isActive: { type: boolean }
+            department: { nullable: true, allOf: [{ $ref: '#/components/schemas/DepartmentSummary' }] }
+            manager: { nullable: true, allOf: [{ $ref: '#/components/schemas/EmployeeSummary' }] }
+    EmployeeEnvelope: { type: object, properties: { data: { $ref: '#/components/schemas/EmployeeDTO' } } }
+    EmployeeListEnvelope:
+      type: object
+      properties:
+        data: { type: array, items: { $ref: '#/components/schemas/EmployeeDTO' } }
+        meta: { type: object, properties: { pagination: { $ref: '#/components/schemas/PaginationMeta' } } }
+    CreateEmployeeRequest:
+      type: object
+      required: [email, password, roleName, firstName, lastName, hireDate]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 8 }
+        roleName: { $ref: '#/components/schemas/RoleName' }
+        firstName: { type: string }
+        lastName: { type: string }
+        jobTitle: { type: string }
+        departmentId: { type: string, nullable: true }
+        managerId: { type: string, nullable: true }
+        hireDate: { type: string, example: '2026-01-15' }
+        phone: { type: string }
+        dateOfBirth: { type: string }
+    UpdateEmployeeRequest:
+      type: object
+      properties:
+        firstName: { type: string }
+        lastName: { type: string }
+        jobTitle: { type: string, nullable: true }
+        departmentId: { type: string, nullable: true }
+        managerId: { type: string, nullable: true }
+        status: { $ref: '#/components/schemas/EmploymentStatus' }
+        phone: { type: string, nullable: true }
+        dateOfBirth: { type: string, nullable: true }
+    ProjectDTO:
+      type: object
+      properties:
+        id: { type: string }
+        code: { type: string }
+        name: { type: string }
+        description: { type: string }
+        status: { $ref: '#/components/schemas/ProjectStatus' }
+        priority: { $ref: '#/components/schemas/PriorityLevel' }
+        department: { nullable: true, allOf: [{ $ref: '#/components/schemas/DepartmentSummary' }] }
+        projectManager: { nullable: true, allOf: [{ $ref: '#/components/schemas/EmployeeSummary' }] }
+        startDate: { type: string }
+        endDate: { type: string }
+        budget: { type: number }
+        memberCount: { type: integer }
+        taskCount: { type: integer }
+        createdAt: { type: string }
+        updatedAt: { type: string }
+    ProjectEnvelope: { type: object, properties: { data: { $ref: '#/components/schemas/ProjectDTO' } } }
+    ProjectListEnvelope:
+      type: object
+      properties:
+        data: { type: array, items: { $ref: '#/components/schemas/ProjectDTO' } }
+        meta: { type: object, properties: { pagination: { $ref: '#/components/schemas/PaginationMeta' } } }
+    CreateProjectRequest:
+      type: object
+      required: [code, name]
+      properties:
+        code: { type: string }
+        name: { type: string }
+        description: { type: string }
+        departmentId: { type: string, nullable: true }
+        projectManagerId: { type: string, nullable: true }
+        status: { $ref: '#/components/schemas/ProjectStatus' }
+        priority: { $ref: '#/components/schemas/PriorityLevel' }
+        startDate: { type: string, nullable: true }
+        endDate: { type: string, nullable: true }
+        budget: { type: number, nullable: true }
+    TaskDTO:
+      type: object
+      properties:
+        id: { type: string }
+        projectId: { type: string }
+        parentTaskId: { type: string, nullable: true }
+        title: { type: string }
+        description: { type: string }
+        status: { $ref: '#/components/schemas/TaskStatus' }
+        priority: { $ref: '#/components/schemas/PriorityLevel' }
+        dueDate: { type: string }
+        estimatedHours: { type: number }
+        assignee: { nullable: true, allOf: [{ $ref: '#/components/schemas/EmployeeSummary' }] }
+        reporter: { nullable: true, allOf: [{ $ref: '#/components/schemas/EmployeeSummary' }] }
+        commentCount: { type: integer }
+        createdAt: { type: string }
+        updatedAt: { type: string }
+    TaskEnvelope: { type: object, properties: { data: { $ref: '#/components/schemas/TaskDTO' } } }
+    TaskListEnvelope:
+      type: object
+      properties:
+        data: { type: array, items: { $ref: '#/components/schemas/TaskDTO' } }
+        meta: { type: object, properties: { pagination: { $ref: '#/components/schemas/PaginationMeta' } } }
+    CreateTaskRequest:
+      type: object
+      required: [projectId, title]
+      properties:
+        projectId: { type: string }
+        title: { type: string }
+        description: { type: string }
+        assigneeId: { type: string, nullable: true }
+        reporterId: { type: string, nullable: true }
+        status: { $ref: '#/components/schemas/TaskStatus' }
+        priority: { $ref: '#/components/schemas/PriorityLevel' }
+        dueDate: { type: string, nullable: true }
+        estimatedHours: { type: number, nullable: true }
+        parentTaskId: { type: string, nullable: true }
+    LeaveRequestDTO:
+      type: object
+      properties:
+        id: { type: string }
+        type: { $ref: '#/components/schemas/LeaveType' }
+        status: { $ref: '#/components/schemas/LeaveStatus' }
+        startDate: { type: string }
+        endDate: { type: string }
+        reason: { type: string }
+        employee: { $ref: '#/components/schemas/EmployeeSummary' }
+        approver: { nullable: true, allOf: [{ $ref: '#/components/schemas/EmployeeSummary' }] }
+        decidedAt: { type: string }
+        createdAt: { type: string }
+        updatedAt: { type: string }
+    LeaveListEnvelope:
+      type: object
+      properties:
+        data: { type: array, items: { $ref: '#/components/schemas/LeaveRequestDTO' } }
+        meta: { type: object, properties: { pagination: { $ref: '#/components/schemas/PaginationMeta' } } }
+    CreateLeaveRequest:
+      type: object
+      required: [type, startDate, endDate]
+      properties:
+        type: { $ref: '#/components/schemas/LeaveType' }
+        startDate: { type: string }
+        endDate: { type: string }
+        reason: { type: string }
+    UserSettings:
+      type: object
+      properties:
+        theme: { type: string, enum: [light, dark, system] }
+        locale: { type: string }
+        emailNotifications: { type: boolean }
+        inAppNotifications: { type: boolean }

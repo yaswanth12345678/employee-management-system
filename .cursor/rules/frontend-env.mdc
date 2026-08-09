@@ -1,0 +1,10 @@
+---
+description: Client environment variable access
+globs: client/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# Frontend Env
+
+- **B1** Never read `import.meta.env` outside `client/src/config/env.ts`. Import `env` from there.
+- **B2** Client public vars are Vite-prefixed (`VITE_*`). Document new keys in `client/.env.example`.

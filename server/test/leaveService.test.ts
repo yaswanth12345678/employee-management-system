@@ -9,13 +9,13 @@ vi.mock('../src/modules/leave/leave.repository', () => ({
   create: vi.fn(),
   list: vi.fn(),
 }));
-vi.mock('../src/common/db/employees', () => ({ findEmployeeIdByUserId: vi.fn() }));
+vi.mock('../src/modules/employees/employees.repository', () => ({ findEmployeeIdByUserId: vi.fn() }));
 vi.mock('../src/modules/notifications', () => ({
   notificationsService: { notifyEmployee: vi.fn() },
 }));
 
 import * as repo from '../src/modules/leave/leave.repository';
-import { findEmployeeIdByUserId } from '../src/common/db/employees';
+import { findEmployeeIdByUserId } from '../src/modules/employees/employees.repository';
 import { notificationsService } from '../src/modules/notifications';
 import { approve, cancel } from '../src/modules/leave/leave.service';
 import { ConflictError, ForbiddenError, NotFoundError } from '../src/common/errors';

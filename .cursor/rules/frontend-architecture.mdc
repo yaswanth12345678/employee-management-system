@@ -1,0 +1,14 @@
+---
+description: Client feature folders, components, and import conventions
+globs: client/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# Frontend Architecture
+
+- **A2** `client/src/components/` = shared UI only (ui / feedback / forms / layout). Feature logic lives under `client/src/features/<name>/`.
+- **A3** Each feature folder: `api/`, `hooks/`, `components/`, `pages/`, `validation.ts`, `index.ts` barrel. Add files only when the concern exists.
+- **A4** Domain/API types come from `@ems/shared`. Local UI-only types stay next to the feature (never invent `client/src/types/`).
+- **A5** Prefer named exports from feature barrels. Page components are the routed entry.
+- **A6** Cross-folder imports use clear relative paths or established aliases; avoid deep `../../../../` when a feature barrel or shared module already exports the symbol.
+- HTTP: only via `httpClient` from `client/src/lib/http` — no ad-hoc `fetch`/`axios.create`.

@@ -1,16 +1,14 @@
 import { useState } from 'react';
-import { Controller, useForm } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link as RouterLink } from 'react-router-dom';
-import { Alert, Box, Link, Stack, TextField, Typography } from '@mui/material';
-import { z } from 'zod';
+import { Alert, Box, Link, Stack, Typography } from '@mui/material';
 import { Button } from '../../../components/ui/Button';
+import { FormTextField } from '../../../components/forms/FormTextField';
 import { ROUTES } from '../../../config/routes';
 import type { NormalizedError } from '../../../lib/http';
 import * as authApi from '../api/authApi';
-
-const schema = z.object({ email: z.string().min(1, 'Email is required').email('Enter a valid email') });
-type Values = z.infer<typeof schema>;
+import { forgotPasswordSchema, type ForgotPasswordValues } from '../validation';
 
 export function ForgotPasswordPage() {
   const [sent, setSent] = useState<string | null>(null);
@@ -20,9 +18,12 @@ export function ForgotPasswordPage() {
     control,
     handleSubmit,
     formState: { isSubmitting },
-  } = useForm<Values>({ resolver: zodResolver(schema), defaultValues: { email: '' } });
+  } = useForm<ForgotPasswordValues>({
+    resolver: zodResolver(forgotPasswordSchema),
+    defaultValues: { email: '' },
+  });
 
-  const onSubmit = async (values: Values) => {
+  const onSubmit = async (values: ForgotPasswordValues) => {
     setError(null);
     try {
       const res = await authApi.forgotPassword(values.email);
@@ -62,21 +63,13 @@ export function ForgotPasswordPage() {
       )}
 
       <Stack spacing={2}>
-        <Controller
-          name="email"
+        <FormTextField
           control={control}
-          render={({ field, fieldState }) => (
-            <TextField
-              {...field}
-              inputRef={field.ref}
-              label="Email"
-              type="email"
-              fullWidth
-              autoFocus
-              error={!!fieldState.error}
-              helperText={fieldState.error?.message}
-            />
-          )}
+          name="email"
+          label="Email"
+          type="email"
+          fullWidth
+          autoFocus
         />
         <Button type="submit" variant="contained" fullWidth loading={isSubmitting}>
           Send reset link

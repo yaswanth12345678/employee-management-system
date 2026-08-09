@@ -1,0 +1,9 @@
+---
+description: Prefer LSP over Grep for symbol navigation
+alwaysApply: true
+---
+
+# Code Navigation
+
+- **F1** LSP is mandatory. Use go-to-definition / find-references / rename-symbol for types, functions, and imports.
+- Grep/Glob only for string literals, path patterns, or when LSP is unavailable — if unavailable, restore it before large refactors.

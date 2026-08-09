@@ -6,10 +6,10 @@ vi.mock('../src/modules/attendance/attendance.repository', () => ({
   todayRecord: vi.fn(),
   list: vi.fn(),
 }));
-vi.mock('../src/common/db/employees', () => ({ findEmployeeIdByUserId: vi.fn() }));
+vi.mock('../src/modules/employees/employees.repository', () => ({ findEmployeeIdByUserId: vi.fn() }));
 
 import * as repo from '../src/modules/attendance/attendance.repository';
-import { findEmployeeIdByUserId } from '../src/common/db/employees';
+import { findEmployeeIdByUserId } from '../src/modules/employees/employees.repository';
 import { checkIn, checkOut, today } from '../src/modules/attendance/attendance.service';
 import { PG_ERROR } from '../src/common/db/pgErrors';
 import { ConflictError, ValidationError } from '../src/common/errors';

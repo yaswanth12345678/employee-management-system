@@ -28,7 +28,9 @@ export function buildTheme(mode: PaletteMode): Theme {
       MuiAppBar: {
         defaultProps: { color: 'inherit', elevation: 0 },
         styleOverrides: {
-          root: { borderBottom: `1px solid ${isDark ? '#2a2a2a' : '#e0e0e0'}` },
+          root: ({ theme }) => ({
+            borderBottom: `1px solid ${theme.palette.divider}`,
+          }),
         },
       },
     },

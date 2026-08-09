@@ -419,7 +419,7 @@ create their own.
 - `common/http/pagination.ts` → `buildPaginationMeta(page, limit, total)`.
 - `common/db/pgErrors.ts` → `PG_ERROR` (`UNIQUE_VIOLATION 23505`, `FOREIGN_KEY_VIOLATION 23503`,
   `CHECK_VIOLATION 23514`) + `pgErrorCode(err)`.
-- `common/db/employees.ts` → `findEmployeeIdByUserId(userId)`.
+- `employees.repository.findEmployeeIdByUserId(userId)` → resolve employee id from user id.
 - `common/http/cookies.ts` → sets/clears the refresh cookie with identical attributes.
 
 ### 6.7 Logging

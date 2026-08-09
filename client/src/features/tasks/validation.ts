@@ -12,3 +12,9 @@ export const taskFormSchema = z.object({
 });
 
 export type TaskFormValues = z.infer<typeof taskFormSchema>;
+
+export const taskCommentSchema = z.object({
+  body: z.string().trim().min(1, 'Comment is required').max(4000),
+});
+
+export type TaskCommentValues = z.infer<typeof taskCommentSchema>;

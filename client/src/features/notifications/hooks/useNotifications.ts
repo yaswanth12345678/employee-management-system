@@ -12,6 +12,7 @@ interface NotificationsState {
 export function useNotifications() {
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [state, setState] = useState<NotificationsState>({ data: [], loading: true, error: null });
+  const [mutating, setMutating] = useState(false);
 
   const fetchFeed = useCallback(
     async (isActive?: () => boolean) => {
@@ -23,7 +24,11 @@ export function useNotifications() {
         }
       } catch (err) {
         if (!isActive || isActive()) {
-          setState((prev) => ({ ...prev, loading: false, error: (err as NormalizedError).message }));
+          setState((prev) => ({
+            ...prev,
+            loading: false,
+            error: (err as NormalizedError).message,
+          }));
         }
       }
     },
@@ -38,8 +43,53 @@ export function useNotifications() {
     };
   }, [fetchFeed]);
 
+  const markRead = useCallback(
+    async (id: string) => {
+      setMutating(true);
+      try {
+        await notificationsApi.markRead(id);
+        await fetchFeed();
+      } finally {
+        setMutating(false);
+      }
+    },
+    [fetchFeed],
+  );
+
+  const remove = useCallback(
+    async (id: string) => {
+      setMutating(true);
+      try {
+        await notificationsApi.remove(id);
+        await fetchFeed();
+      } finally {
+        setMutating(false);
+      }
+    },
+    [fetchFeed],
+  );
+
+  const markAllRead = useCallback(async () => {
+    setMutating(true);
+    try {
+      await notificationsApi.markAllRead();
+      await fetchFeed();
+    } finally {
+      setMutating(false);
+    }
+  }, [fetchFeed]);
+
   return useMemo(
-    () => ({ ...state, unreadOnly, setUnreadOnly, refetch: fetchFeed }),
-    [state, unreadOnly, fetchFeed],
+    () => ({
+      ...state,
+      unreadOnly,
+      setUnreadOnly,
+      refetch: fetchFeed,
+      markRead,
+      remove,
+      markAllRead,
+      mutating,
+    }),
+    [state, unreadOnly, fetchFeed, markRead, remove, markAllRead, mutating],
   );
 }

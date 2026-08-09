@@ -12,9 +12,8 @@ import { ErrorState } from '../../../components/feedback/ErrorState';
 import { PageLoader } from '../../../components/feedback/PageLoader';
 import { useSnackbar } from '../../../contexts/SnackbarContext';
 import { useNotifications } from '../hooks/useNotifications';
-import { useNotificationsBadge } from '../NotificationsBadgeProvider';
+import { useNotificationsBadge } from '../components/NotificationsBadgeProvider';
 import { onRealtime } from '../../../lib/realtime/socket';
-import * as notificationsApi from '../api/notificationsApi';
 
 function NotificationItem({
   item,
@@ -66,7 +65,6 @@ export function NotificationsPage() {
   const feed = useNotifications();
   const badge = useNotificationsBadge();
 
-  // Live: refresh the feed when a new notification arrives over the socket.
   useEffect(() => {
     const off = onRealtime((message) => {
       if (message.type === 'notification') void feed.refetch();
@@ -76,8 +74,7 @@ export function NotificationsPage() {
 
   const handleRead = async (id: string) => {
     try {
-      await notificationsApi.markRead(id);
-      await feed.refetch();
+      await feed.markRead(id);
       badge.refresh();
     } catch (err) {
       notify((err as NormalizedError).message, 'error');
@@ -86,8 +83,7 @@ export function NotificationsPage() {
 
   const handleDelete = async (id: string) => {
     try {
-      await notificationsApi.remove(id);
-      await feed.refetch();
+      await feed.remove(id);
       badge.refresh();
     } catch (err) {
       notify((err as NormalizedError).message, 'error');
@@ -96,9 +92,8 @@ export function NotificationsPage() {
 
   const handleMarkAll = async () => {
     try {
-      await notificationsApi.markAllRead();
+      await feed.markAllRead();
       notify('All notifications marked as read', 'success');
-      await feed.refetch();
       badge.refresh();
     } catch (err) {
       notify((err as NormalizedError).message, 'error');
@@ -111,7 +106,12 @@ export function NotificationsPage() {
         title="Notifications"
         subtitle="Stay up to date with what's happening"
         action={
-          <Button variant="outlined" startIcon={<DoneAllIcon />} onClick={handleMarkAll}>
+          <Button
+            variant="outlined"
+            startIcon={<DoneAllIcon />}
+            onClick={handleMarkAll}
+            loading={feed.mutating}
+          >
             Mark all read
           </Button>
         }

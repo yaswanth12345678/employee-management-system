@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { Box, Button, Typography } from '@mui/material';
+import { env } from '../config/env';
 
 /**
  * A React Error Boundary.
@@ -31,7 +32,9 @@ export class ErrorBoundary extends Component<Props, State> {
 
   // Commit phase: the place to report the error to a monitoring service (Sentry, etc.).
   override componentDidCatch(error: Error, info: ErrorInfo): void {
-    console.error('ErrorBoundary caught an error:', error, info.componentStack);
+    if (env.isDevelopment) {
+      console.error('ErrorBoundary caught an error:', error, info.componentStack);
+    }
   }
 
   private readonly handleReset = (): void => {

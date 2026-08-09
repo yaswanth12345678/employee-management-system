@@ -1,0 +1,13 @@
+---
+description: MUI design-system and styling rules for the client
+globs: client/**/*.{ts,tsx,css}
+alwaysApply: false
+---
+
+# Frontend Styling (MUI)
+
+- **D1** Use MUI components + `sx` / theme tokens. Do not add Tailwind or CSS-in-JS libraries outside Emotion/MUI.
+- **D2** Theme tokens live in `client/src/theme/`. Prefer `theme.palette`, `theme.spacing`, typography variants over hardcoded hex/rgb.
+- **D3** Icons: `@mui/icons-material` only.
+- **D4** Shared primitives: `client/src/components/ui/`, feedback in `components/feedback/`, form fields in `components/forms/`.
+- **D5** Avoid one-off global CSS. Colocate styles via MUI `sx` or theme overrides.

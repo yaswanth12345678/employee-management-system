@@ -1,0 +1,13 @@
+---
+description: Monorepo-wide conventions for EMS (client, server, shared)
+alwaysApply: true
+---
+
+# Project Conventions
+
+- Monorepo packages: `client/` (React SPA), `server/` (Express API), `shared/` (`@ems/shared` contract).
+- API types/enums live in `shared/` — do not duplicate DTO shapes in client or server.
+- No `console.log` in production paths. Client: guard with `import.meta.env.DEV` or omit. Server: use `libs/logger` (pino).
+- Never hardcode secrets. AI must not run `npm install <pkg>` without user approval.
+- Do not introduce Next.js, Redux, Zustand, Tailwind, Prisma, NestJS, GraphQL, or MongoDB — stack is fixed (see `docs/TECHNICAL_DOCUMENTATION.md`).
+- Prefer small, focused changes. Match existing folder layout and naming.

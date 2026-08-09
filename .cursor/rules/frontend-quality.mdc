@@ -1,0 +1,12 @@
+---
+description: TypeScript and test quality rules for the client
+globs: client/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# Frontend Code Quality
+
+- **E1** No `any`. Prefer `unknown` + narrow, or types from `@ems/shared`.
+- **E2** Match Prettier/ESLint (2-space indent). Run format/lint from repo root before PR.
+- **E3** `npm --prefix client run typecheck` must pass for client changes.
+- **E4** Vitest + Testing Library for new pure logic / hooks. Keep tests next to the unit or under a clear test convention already used in `client/`.

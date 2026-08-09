@@ -1,6 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo } from 'react';
+import { Controller, useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Autocomplete,
+  Box,
   Dialog,
   DialogActions,
   DialogContent,
@@ -15,12 +18,14 @@ import {
   Typography,
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/DeleteOutline';
-import type { EmployeeDTO, ProjectDTO, ProjectMemberDTO } from '@ems/shared';
+import type { EmployeeDTO, ProjectDTO } from '@ems/shared';
 import { Button } from '../../../components/ui/Button';
+import { FormTextField } from '../../../components/forms/FormTextField';
 import { useSnackbar } from '../../../contexts/SnackbarContext';
 import { useEmployeeOptions } from '../../employees';
 import type { NormalizedError } from '../../../lib/http';
-import * as projectsApi from '../api/projectsApi';
+import { useProjectMembers } from '../hooks/useProjectMembers';
+import { projectMemberSchema, type ProjectMemberValues } from '../validation';
 
 interface ProjectMembersDialogProps {
   open: boolean;
@@ -39,65 +44,40 @@ export function ProjectMembersDialog({
 }: ProjectMembersDialogProps) {
   const { notify } = useSnackbar();
   const employees = useEmployeeOptions();
-  const [members, setMembers] = useState<ProjectMemberDTO[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [selected, setSelected] = useState<EmployeeDTO | null>(null);
-  const [role, setRole] = useState('');
-  const [busy, setBusy] = useState(false);
+  const { members, loading, busy, addMember, removeMember } = useProjectMembers(
+    project?.id ?? null,
+    open,
+  );
 
-  // `isActive` lets the initial-load effect abandon a stale response if the project changed while
-  // the request was in flight; mutation callbacks call load() with the default (always apply).
-  const load = async (projectId: string, isActive: () => boolean = () => true) => {
-    setLoading(true);
-    try {
-      const list = await projectsApi.listMembers(projectId);
-      if (isActive()) setMembers(list);
-    } catch {
-      if (isActive()) setMembers([]);
-    } finally {
-      if (isActive()) setLoading(false);
-    }
-  };
+  const { control, handleSubmit, reset, setValue, watch } = useForm<ProjectMemberValues>({
+    resolver: zodResolver(projectMemberSchema),
+    defaultValues: { employeeId: '', roleOnProject: '' },
+  });
 
   useEffect(() => {
-    if (!open || !project) return undefined;
-    let active = true;
-    setSelected(null);
-    setRole('');
-    void load(project.id, () => active);
-    return () => {
-      active = false;
-    };
-  }, [open, project]);
+    if (open) reset({ employeeId: '', roleOnProject: '' });
+  }, [open, project?.id, reset]);
 
-  const memberIds = new Set(members.map((m) => m.employee.id));
+  const memberIds = useMemo(() => new Set(members.map((m) => m.employee.id)), [members]);
   const addable = employees.filter((e) => !memberIds.has(e.id));
+  const selectedId = watch('employeeId');
+  const selected =
+    addable.find((e) => e.id === selectedId) ?? employees.find((e) => e.id === selectedId) ?? null;
 
-  const handleAdd = async () => {
-    if (!project || !selected) return;
-    setBusy(true);
+  const onSubmit = async (values: ProjectMemberValues) => {
     try {
-      await projectsApi.addMember(project.id, {
-        employeeId: selected.id,
-        roleOnProject: role || undefined,
-      });
-      setSelected(null);
-      setRole('');
-      await load(project.id);
+      await addMember(values.employeeId, values.roleOnProject || undefined);
+      reset({ employeeId: '', roleOnProject: '' });
       onChanged();
       notify('Member added', 'success');
     } catch (err) {
       notify((err as NormalizedError).message, 'error');
-    } finally {
-      setBusy(false);
     }
   };
 
   const handleRemove = async (employeeId: string) => {
-    if (!project) return;
     try {
-      await projectsApi.removeMember(project.id, employeeId);
-      await load(project.id);
+      await removeMember(employeeId);
       onChanged();
       notify('Member removed', 'success');
     } catch (err) {
@@ -125,7 +105,11 @@ export function ProjectMembersDialog({
                 secondaryAction={
                   canWrite ? (
                     <Tooltip title="Remove">
-                      <IconButton edge="end" color="error" onClick={() => handleRemove(m.employee.id)}>
+                      <IconButton
+                        edge="end"
+                        color="error"
+                        onClick={() => handleRemove(m.employee.id)}
+                      >
                         <DeleteIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
@@ -143,27 +127,50 @@ export function ProjectMembersDialog({
       </DialogContent>
       {canWrite && (
         <DialogActions sx={{ p: 2 }}>
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ width: '100%' }}>
-            <Autocomplete
-              options={addable}
-              getOptionLabel={(o) => `${o.firstName} ${o.lastName}`}
-              value={selected}
-              onChange={(_e, value) => setSelected(value)}
-              size="small"
-              sx={{ flex: 1, minWidth: 180 }}
-              renderInput={(params) => <TextField {...params} label="Employee" />}
-            />
-            <TextField
-              label="Role"
-              value={role}
-              onChange={(e) => setRole(e.target.value)}
-              size="small"
-              sx={{ minWidth: 140 }}
-            />
-            <Button variant="contained" onClick={handleAdd} loading={busy} disabled={!selected}>
-              Add
-            </Button>
-          </Stack>
+          <Box
+            component="form"
+            onSubmit={handleSubmit(onSubmit)}
+            noValidate
+            sx={{ width: '100%' }}
+          >
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ width: '100%' }}>
+              <Controller
+                control={control}
+                name="employeeId"
+                render={({ field, fieldState }) => (
+                  <Autocomplete
+                    options={addable}
+                    getOptionLabel={(o: EmployeeDTO) => `${o.firstName} ${o.lastName}`}
+                    value={selected}
+                    onChange={(_e, value) => {
+                      field.onChange(value?.id ?? '');
+                      setValue('employeeId', value?.id ?? '', { shouldValidate: true });
+                    }}
+                    size="small"
+                    sx={{ flex: 1, minWidth: 180 }}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        label="Employee"
+                        error={Boolean(fieldState.error)}
+                        helperText={fieldState.error?.message}
+                      />
+                    )}
+                  />
+                )}
+              />
+              <FormTextField
+                control={control}
+                name="roleOnProject"
+                label="Role"
+                size="small"
+                sx={{ minWidth: 140 }}
+              />
+              <Button type="submit" variant="contained" loading={busy} disabled={!selectedId}>
+                Add
+              </Button>
+            </Stack>
+          </Box>
         </DialogActions>
       )}
     </Dialog>

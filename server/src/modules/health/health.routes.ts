@@ -1,12 +1,11 @@
 import { Router } from 'express';
 import { asyncHandler } from '../../common/http/asyncHandler';
-import { liveness, readiness } from './health.controller';
+import * as controller from './health.controller';
 
 /**
- * Health module router. This is the shape every future module follows:
- * a `*.routes.ts` file maps URLs to controllers (and, later, to auth/validation middleware).
+ * Health module router. Liveness and readiness probes for orchestrators / load balancers.
  */
 export const healthRouter = Router();
 
-healthRouter.get('/', liveness);
-healthRouter.get('/ready', asyncHandler(readiness));
+healthRouter.get('/', controller.liveness);
+healthRouter.get('/ready', asyncHandler(controller.readiness));

@@ -1,0 +1,12 @@
+---
+description: Shared package contract rules for @ems/shared
+globs: shared/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# Shared Contract (`@ems/shared`)
+
+- Framework-agnostic only — no React, Express, or Node APIs.
+- Export enums and DTO/API types from `shared/src`; keep the public barrel in `shared/src/index.ts`.
+- Changing a shared type is a **contract change**: update server validation + client forms/API usage in the same change set when possible.
+- After editing shared, rebuild (`npm --prefix shared run build`) so client/server see `dist/`.

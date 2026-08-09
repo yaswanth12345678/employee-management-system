@@ -16,7 +16,6 @@ import { useLeave } from '../hooks/useLeave';
 import { LeaveFormDialog } from '../components/LeaveFormDialog';
 import { LeaveStatusChip } from '../components/LeaveStatusChip';
 import type { LeaveFormValues } from '../validation';
-import * as leaveApi from '../api/leaveApi';
 
 const STATUS_FILTERS = [
   { value: 'pending', label: 'Pending' },
@@ -38,7 +37,7 @@ export function LeavePage() {
   const handleApply = async (values: LeaveFormValues) => {
     setSubmitting(true);
     try {
-      await leaveApi.apply({
+      await leave.apply({
         type: values.type,
         startDate: values.startDate,
         endDate: values.endDate,
@@ -46,7 +45,6 @@ export function LeavePage() {
       });
       notify('Leave request submitted', 'success');
       applyDialog.close();
-      await leave.refetch();
     } catch (err) {
       notify((err as NormalizedError).message, 'error');
     } finally {
@@ -58,18 +56,29 @@ export function LeavePage() {
     try {
       await action();
       notify(successMsg, 'success');
-      await leave.refetch();
     } catch (err) {
       notify((err as NormalizedError).message, 'error');
     }
   };
 
   const columns: Column<LeaveRequestDTO>[] = [
-    { key: 'employee', header: 'Employee', render: (r) => `${r.employee.firstName} ${r.employee.lastName}` },
-    { key: 'type', header: 'Type', render: (r) => r.type.charAt(0).toUpperCase() + r.type.slice(1) },
+    {
+      key: 'employee',
+      header: 'Employee',
+      render: (r) => `${r.employee.firstName} ${r.employee.lastName}`,
+    },
+    {
+      key: 'type',
+      header: 'Type',
+      render: (r) => r.type.charAt(0).toUpperCase() + r.type.slice(1),
+    },
     { key: 'dates', header: 'Dates', render: (r) => `${r.startDate} → ${r.endDate}` },
     { key: 'status', header: 'Status', render: (r) => <LeaveStatusChip status={r.status} /> },
-    { key: 'approver', header: 'Approver', render: (r) => (r.approver ? `${r.approver.firstName} ${r.approver.lastName}` : '—') },
+    {
+      key: 'approver',
+      header: 'Approver',
+      render: (r) => (r.approver ? `${r.approver.firstName} ${r.approver.lastName}` : '—'),
+    },
   ];
 
   return (
@@ -128,7 +137,7 @@ export function LeavePage() {
                     <IconButton
                       size="small"
                       color="success"
-                      onClick={() => act(() => leaveApi.approve(r.id), 'Leave approved')}
+                      onClick={() => act(() => leave.approve(r.id), 'Leave approved')}
                     >
                       <CheckIcon fontSize="small" />
                     </IconButton>
@@ -137,7 +146,7 @@ export function LeavePage() {
                     <IconButton
                       size="small"
                       color="error"
-                      onClick={() => act(() => leaveApi.reject(r.id), 'Leave rejected')}
+                      onClick={() => act(() => leave.reject(r.id), 'Leave rejected')}
                     >
                       <CloseIcon fontSize="small" />
                     </IconButton>
@@ -148,7 +157,7 @@ export function LeavePage() {
                 <Tooltip title="Cancel">
                   <IconButton
                     size="small"
-                    onClick={() => act(() => leaveApi.cancel(r.id), 'Leave cancelled')}
+                    onClick={() => act(() => leave.cancel(r.id), 'Leave cancelled')}
                   >
                     <CancelScheduleSendIcon fontSize="small" />
                   </IconButton>

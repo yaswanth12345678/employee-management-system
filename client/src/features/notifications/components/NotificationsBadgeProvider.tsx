@@ -7,9 +7,9 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
-import { onRealtime } from '../../lib/realtime/socket';
-import * as notificationsApi from './api/notificationsApi';
+import { useAuth } from '../../../contexts/AuthContext';
+import { onRealtime } from '../../../lib/realtime/socket';
+import * as notificationsApi from '../api/notificationsApi';
 
 /**
  * Shared unread-count for the whole app, so the topbar bell and the notifications page use ONE
@@ -56,7 +56,6 @@ export function NotificationsBadgeProvider({
     }
     void load();
     const timer = setInterval(load, pollMs);
-    // Live push: bump the badge immediately when a notification arrives over the socket.
     const off = onRealtime((message) => {
       if (message.type === 'notification') setCount((current) => current + 1);
     });

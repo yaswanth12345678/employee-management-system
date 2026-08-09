@@ -2,7 +2,7 @@ import type { LeaveRequestDTO, PaginatedResponse, RoleName } from '@ems/shared';
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '../../common/errors';
 import { buildPaginationMeta } from '../../common/http/pagination';
 import { PG_ERROR, pgErrorCode } from '../../common/db/pgErrors';
-import { findEmployeeIdByUserId } from '../../common/db/employees';
+import { findEmployeeIdByUserId } from '../employees/employees.repository';
 import { notificationsService } from '../notifications';
 import * as repo from './leave.repository';
 import type { LeaveRow, ListParams } from './leave.repository';

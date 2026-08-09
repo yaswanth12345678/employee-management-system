@@ -70,3 +70,12 @@ export class RateLimitError extends AppError {
     super(message);
   }
 }
+
+/** Dependency down (e.g. DB) — load balancers should stop routing traffic here. */
+export class ServiceUnavailableError extends AppError {
+  readonly statusCode = 503;
+  readonly code: ApiErrorCode = 'INTERNAL';
+  constructor(message = 'Service temporarily unavailable') {
+    super(message);
+  }
+}

@@ -2,7 +2,7 @@ import type { AttendanceDTO, PaginatedResponse } from '@ems/shared';
 import { ConflictError, ValidationError } from '../../common/errors';
 import { buildPaginationMeta } from '../../common/http/pagination';
 import { PG_ERROR, mapConstraint } from '../../common/db/pgErrors';
-import { findEmployeeIdByUserId } from '../../common/db/employees';
+import { findEmployeeIdByUserId } from '../employees/employees.repository';
 import * as repo from './attendance.repository';
 import type { AttendanceRow, ListParams } from './attendance.repository';
 import type { CheckInInput } from './attendance.validation';

@@ -1,0 +1,13 @@
+---
+description: TypeScript and test quality rules for the server
+globs: server/**/*.{ts,js}
+alwaysApply: false
+---
+
+# Backend Code Quality
+
+- **E1** No `any`. Prefer `unknown` + guards, Zod inference, or `@ems/shared` types.
+- **E2** Match root Prettier/ESLint (2-space indent).
+- **E3** `npm --prefix server run typecheck` must pass for server changes.
+- **E4** Vitest for new pure service/validation logic. Prefer testing services with mocked repositories over full HTTP unless needed.
+- Map PG errors via `common/db/pgErrors` in services (unique → Conflict, FK → Validation/NotFound as appropriate).

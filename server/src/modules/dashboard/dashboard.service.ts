@@ -1,5 +1,5 @@
 import type { DashboardSummaryDTO, RoleName } from '@ems/shared';
-import { findEmployeeIdByUserId } from '../../common/db/employees';
+import { findEmployeeIdByUserId } from '../employees/employees.repository';
 import { notificationsService } from '../notifications';
 import * as repo from './dashboard.repository';
 

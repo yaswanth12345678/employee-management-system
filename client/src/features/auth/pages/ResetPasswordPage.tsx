@@ -1,16 +1,14 @@
-import { Controller, useForm } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link as RouterLink, useNavigate, useSearchParams } from 'react-router-dom';
-import { Alert, Box, Link, Stack, TextField, Typography } from '@mui/material';
-import { z } from 'zod';
+import { Alert, Box, Link, Stack, Typography } from '@mui/material';
 import { Button } from '../../../components/ui/Button';
+import { FormTextField } from '../../../components/forms/FormTextField';
 import { ROUTES } from '../../../config/routes';
 import { useSnackbar } from '../../../contexts/SnackbarContext';
 import type { NormalizedError } from '../../../lib/http';
 import * as authApi from '../api/authApi';
-
-const schema = z.object({ newPassword: z.string().min(8, 'Password must be at least 8 characters') });
-type Values = z.infer<typeof schema>;
+import { resetPasswordSchema, type ResetPasswordValues } from '../validation';
 
 export function ResetPasswordPage() {
   const [params] = useSearchParams();
@@ -22,9 +20,12 @@ export function ResetPasswordPage() {
     handleSubmit,
     formState: { isSubmitting },
     setError: setFieldError,
-  } = useForm<Values>({ resolver: zodResolver(schema), defaultValues: { newPassword: '' } });
+  } = useForm<ResetPasswordValues>({
+    resolver: zodResolver(resetPasswordSchema),
+    defaultValues: { newPassword: '' },
+  });
 
-  const onSubmit = async (values: Values) => {
+  const onSubmit = async (values: ResetPasswordValues) => {
     try {
       await authApi.resetPassword(token, values.newPassword);
       notify('Password reset. Please sign in.', 'success');
@@ -54,21 +55,13 @@ export function ResetPasswordPage() {
         Choose a new password for your account.
       </Typography>
       <Stack spacing={2}>
-        <Controller
-          name="newPassword"
+        <FormTextField
           control={control}
-          render={({ field, fieldState }) => (
-            <TextField
-              {...field}
-              inputRef={field.ref}
-              label="New password"
-              type="password"
-              fullWidth
-              autoFocus
-              error={!!fieldState.error}
-              helperText={fieldState.error?.message}
-            />
-          )}
+          name="newPassword"
+          label="New password"
+          type="password"
+          fullWidth
+          autoFocus
         />
         <Button type="submit" variant="contained" fullWidth loading={isSubmitting}>
           Reset password

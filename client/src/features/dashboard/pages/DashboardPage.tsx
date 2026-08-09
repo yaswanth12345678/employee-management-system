@@ -1,46 +1,17 @@
-import { useEffect, useState } from 'react';
 import { Box, Paper, Stack, Typography } from '@mui/material';
-import type { DashboardSummaryDTO } from '@ems/shared';
-import type { NormalizedError } from '../../../lib/http';
 import { PageHeader } from '../../../components/layout/PageHeader';
 import { PageLoader } from '../../../components/feedback/PageLoader';
 import { ErrorState } from '../../../components/feedback/ErrorState';
 import { useAuth } from '../../../contexts/AuthContext';
-import * as dashboardApi from '../api/dashboardApi';
-
-function StatCard({ label, value }: { label: string; value: string | number }) {
-  return (
-    <Paper variant="outlined" sx={{ p: 3 }}>
-      <Typography variant="overline" color="text.secondary">
-        {label}
-      </Typography>
-      <Typography variant="h4" fontWeight={700}>
-        {value}
-      </Typography>
-    </Paper>
-  );
-}
+import { StatCard } from '../components/StatCard';
+import { useDashboard } from '../hooks/useDashboard';
 
 export function DashboardPage() {
   const { user } = useAuth();
-  const [summary, setSummary] = useState<DashboardSummaryDTO | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { summary, error, loading, refetch } = useDashboard();
 
-  const load = async () => {
-    try {
-      setError(null);
-      setSummary(await dashboardApi.summary());
-    } catch (err) {
-      setError((err as NormalizedError).message);
-    }
-  };
-
-  useEffect(() => {
-    void load();
-  }, []);
-
-  if (error) return <ErrorState message={error} onRetry={load} />;
-  if (!summary) return <PageLoader />;
+  if (error) return <ErrorState message={error} onRetry={refetch} />;
+  if (loading || !summary) return <PageLoader />;
 
   return (
     <>
@@ -60,12 +31,22 @@ export function DashboardPage() {
         <StatCard label="My pending leave" value={summary.myPendingLeave} />
         <StatCard
           label="Today's attendance"
-          value={summary.todayAttendanceStatus ? summary.todayAttendanceStatus.replace('_', ' ') : 'Not checked in'}
+          value={
+            summary.todayAttendanceStatus
+              ? summary.todayAttendanceStatus.replace('_', ' ')
+              : 'Not checked in'
+          }
         />
         {summary.teamStats && <StatCard label="Headcount" value={summary.teamStats.headcount} />}
-        {summary.teamStats && <StatCard label="On leave today" value={summary.teamStats.onLeaveToday} />}
-        {summary.projectStats && <StatCard label="Active projects" value={summary.projectStats.active} />}
-        {summary.projectStats && <StatCard label="Overdue projects" value={summary.projectStats.overdue} />}
+        {summary.teamStats && (
+          <StatCard label="On leave today" value={summary.teamStats.onLeaveToday} />
+        )}
+        {summary.projectStats && (
+          <StatCard label="Active projects" value={summary.projectStats.active} />
+        )}
+        {summary.projectStats && (
+          <StatCard label="Overdue projects" value={summary.projectStats.overdue} />
+        )}
       </Box>
 
       <Typography variant="subtitle1" fontWeight={700} sx={{ mt: 4, mb: 1 }}>

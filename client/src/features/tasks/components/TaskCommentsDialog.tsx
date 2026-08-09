@@ -1,4 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Box,
   Dialog,
@@ -6,62 +8,42 @@ import {
   DialogContent,
   DialogTitle,
   Stack,
-  TextField,
   Typography,
 } from '@mui/material';
-import type { CommentDTO, TaskDTO } from '@ems/shared';
+import type { TaskDTO } from '@ems/shared';
 import { Button } from '../../../components/ui/Button';
+import { FormTextField } from '../../../components/forms/FormTextField';
 import { useSnackbar } from '../../../contexts/SnackbarContext';
 import type { NormalizedError } from '../../../lib/http';
-import * as tasksApi from '../api/tasksApi';
+import { useTaskComments } from '../hooks/useTaskComments';
+import { taskCommentSchema, type TaskCommentValues } from '../validation';
 
 interface TaskCommentsDialogProps {
   open: boolean;
   task: TaskDTO | null;
   onClose: () => void;
-  onChanged: () => void; // refresh the task list (comment count)
+  onChanged: () => void;
 }
 
 export function TaskCommentsDialog({ open, task, onClose, onChanged }: TaskCommentsDialogProps) {
   const { notify } = useSnackbar();
-  const [comments, setComments] = useState<CommentDTO[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [body, setBody] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+  const { comments, loading, submitting, addComment } = useTaskComments(task?.id ?? null, open);
+  const { control, handleSubmit, reset } = useForm<TaskCommentValues>({
+    resolver: zodResolver(taskCommentSchema),
+    defaultValues: { body: '' },
+  });
 
   useEffect(() => {
-    if (!open || !task) return undefined;
-    let active = true;
-    setLoading(true);
-    setBody('');
-    tasksApi
-      .listComments(task.id)
-      .then((list) => {
-        if (active) setComments(list);
-      })
-      .catch(() => {
-        if (active) setComments([]);
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [open, task]);
+    if (open) reset({ body: '' });
+  }, [open, task?.id, reset]);
 
-  const handleAdd = async () => {
-    if (!task || !body.trim()) return;
-    setSubmitting(true);
+  const onSubmit = async (values: TaskCommentValues) => {
     try {
-      const created = await tasksApi.addComment(task.id, { body: body.trim() });
-      setComments((prev) => [...prev, created]);
-      setBody('');
+      await addComment(values.body.trim());
+      reset({ body: '' });
       onChanged();
     } catch (err) {
       notify((err as NormalizedError).message, 'error');
-    } finally {
-      setSubmitting(false);
     }
   };
 
@@ -98,28 +80,28 @@ export function TaskCommentsDialog({ open, task, onClose, onChanged }: TaskComme
         )}
       </DialogContent>
       <DialogActions sx={{ p: 2 }}>
-        <Stack direction="row" spacing={1} sx={{ width: '100%' }}>
-          <TextField
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            placeholder="Add a comment…"
-            fullWidth
-            size="small"
-            multiline
-            maxRows={4}
-            // Disabled until the initial fetch resolves: posting mid-load would optimistically append
-            // a comment that the still-in-flight listComments response would then clobber.
-            disabled={loading}
-          />
-          <Button
-            variant="contained"
-            onClick={handleAdd}
-            loading={submitting}
-            disabled={!body.trim() || loading}
-          >
-            Post
-          </Button>
-        </Stack>
+        <Box
+          component="form"
+          onSubmit={handleSubmit(onSubmit)}
+          noValidate
+          sx={{ width: '100%' }}
+        >
+          <Stack direction="row" spacing={1} sx={{ width: '100%' }}>
+            <FormTextField
+              control={control}
+              name="body"
+              placeholder="Add a comment…"
+              fullWidth
+              size="small"
+              multiline
+              maxRows={4}
+              disabled={loading}
+            />
+            <Button type="submit" variant="contained" loading={submitting} disabled={loading}>
+              Post
+            </Button>
+          </Stack>
+        </Box>
       </DialogActions>
     </Dialog>
   );

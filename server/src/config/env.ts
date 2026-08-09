@@ -29,6 +29,10 @@ const envSchema = z.object({
   LOG_LEVEL: z
     .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace'])
     .default('info'),
+
+  // Seed script only (npm run seed). Defaults are safe for local/dev.
+  SEED_ADMIN_EMAIL: z.string().email().default('admin@ems.local'),
+  SEED_ADMIN_PASSWORD: z.string().min(8).default('Admin@12345'),
 });
 
 const parsed = envSchema.safeParse(process.env);

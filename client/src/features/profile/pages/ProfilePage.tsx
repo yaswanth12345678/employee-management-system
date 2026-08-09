@@ -1,8 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Avatar, Box, Divider, Grid, Paper, Stack, Typography } from '@mui/material';
-import type { EmployeeDTO } from '@ems/shared';
 import type { NormalizedError } from '../../../lib/http';
 import { PageHeader } from '../../../components/layout/PageHeader';
 import { Button } from '../../../components/ui/Button';
@@ -10,7 +9,7 @@ import { FormTextField } from '../../../components/forms/FormTextField';
 import { PageLoader } from '../../../components/feedback/PageLoader';
 import { ErrorState } from '../../../components/feedback/ErrorState';
 import { useSnackbar } from '../../../contexts/SnackbarContext';
-import * as profileApi from '../api/profileApi';
+import { useProfile } from '../hooks/useProfile';
 import {
   passwordSchema,
   profileEditSchema,
@@ -31,12 +30,19 @@ function InfoRow({ label, value }: { label: string; value?: string }) {
 
 export function ProfilePage() {
   const { notify } = useSnackbar();
-  const [profile, setProfile] = useState<EmployeeDTO | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [savingProfile, setSavingProfile] = useState(false);
-  const [savingPassword, setSavingPassword] = useState(false);
-  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const {
+    profile,
+    loadError,
+    loading,
+    savingProfile,
+    savingPassword,
+    uploadingAvatar,
+    refetch,
+    updateProfile,
+    uploadAvatar,
+    changePassword,
+  } = useProfile();
 
   const editForm = useForm<ProfileEditValues>({
     resolver: zodResolver(profileEditSchema),
@@ -47,72 +53,48 @@ export function ProfilePage() {
     defaultValues: { currentPassword: '', newPassword: '' },
   });
 
-  const load = async () => {
-    try {
-      const data = await profileApi.getProfile();
-      setProfile(data);
-      editForm.reset({
-        phone: data.phone ?? '',
-        dateOfBirth: data.dateOfBirth ?? '',
-        avatarUrl: data.avatarUrl ?? '',
-      });
-    } catch (err) {
-      setLoadError((err as NormalizedError).message);
-    }
-  };
-
   useEffect(() => {
-    void load();
-  }, []);
+    if (!profile) return;
+    editForm.reset({
+      phone: profile.phone ?? '',
+      dateOfBirth: profile.dateOfBirth ?? '',
+      avatarUrl: profile.avatarUrl ?? '',
+    });
+  }, [profile, editForm]);
 
   const handleSaveProfile = async (values: ProfileEditValues) => {
-    setSavingProfile(true);
     try {
-      const updated = await profileApi.updateProfile({
-        phone: values.phone || null,
-        dateOfBirth: values.dateOfBirth || null,
-        avatarUrl: values.avatarUrl || null,
-      });
-      setProfile(updated);
+      await updateProfile(values);
       notify('Profile updated', 'success');
     } catch (err) {
       notify((err as NormalizedError).message, 'error');
-    } finally {
-      setSavingProfile(false);
     }
   };
 
   const handleAvatarSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    event.target.value = ''; // allow re-selecting the same file
+    event.target.value = '';
     if (!file) return;
-    setUploadingAvatar(true);
     try {
-      const updated = await profileApi.uploadAvatar(file);
-      setProfile(updated);
+      await uploadAvatar(file);
       notify('Photo updated', 'success');
     } catch (err) {
       notify((err as NormalizedError).message, 'error');
-    } finally {
-      setUploadingAvatar(false);
     }
   };
 
   const handleChangePassword = async (values: PasswordValues) => {
-    setSavingPassword(true);
     try {
-      await profileApi.changePassword(values);
+      await changePassword(values);
       notify('Password changed', 'success');
       passwordForm.reset({ currentPassword: '', newPassword: '' });
     } catch (err) {
       notify((err as NormalizedError).message, 'error');
-    } finally {
-      setSavingPassword(false);
     }
   };
 
-  if (loadError) return <ErrorState message={loadError} onRetry={load} />;
-  if (!profile) return <PageLoader />;
+  if (loadError) return <ErrorState message={loadError} onRetry={refetch} />;
+  if (loading || !profile) return <PageLoader />;
 
   return (
     <>

@@ -1,0 +1,23 @@
+---
+description: Express layered module architecture for the server
+globs: server/**/*.{ts,js}
+alwaysApply: false
+---
+
+# Backend Architecture
+
+Layer order (never skip or invert):
+
+```
+routes → middleware → controller → service → repository → PostgreSQL
+```
+
+- **A3** One folder per domain under `server/src/modules/<name>/`:
+  `*.routes.ts`, `*.controller.ts`, `*.service.ts`, `*.repository.ts`, `*.validation.ts`, `index.ts`.
+- **A4** Request/response DTOs and enums from `@ems/shared`. Zod schemas in `*.validation.ts`. Do not invent a central `server/src/types/` for domain DTOs.
+- **Controller** HTTP only: read `req`, call **one** service method, shape `res`. Wrap with `asyncHandler`.
+- **Service** business rules only — no `req`/`res`, no SQL.
+- **Repository** is the **only** place SQL/`pool` queries live.
+- **S4** Mount routers in `server/src/routes/index.ts` under `/api/v1`.
+- Errors: throw `AppError` subclasses; never send ad-hoc error JSON from controllers.
+- Auth: `authenticate` then `authorize(...roles)` then `validate(schema)` as needed.

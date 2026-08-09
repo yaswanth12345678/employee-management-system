@@ -6,4 +6,5 @@ export {
   NotFoundError,
   ConflictError,
   RateLimitError,
+  ServiceUnavailableError,
 } from './AppError';

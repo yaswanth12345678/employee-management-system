@@ -1,0 +1,14 @@
+---
+description: Auth, cookies, tokens, and XSS rules for the EMS monorepo
+alwaysApply: true
+---
+
+# Auth & Security
+
+- **C1** Refresh token: httpOnly cookie only (`SameSite=Lax`, path `/api/v1/auth`). Never store refresh tokens in `localStorage` / `sessionStorage`.
+- **C2** Access token: in-memory on the client (`setAccessToken` in `client/src/lib/http/client.ts`). Send as `Authorization: Bearer`. Axios must use `withCredentials: true`.
+- **C3** Logout is a server round-trip (`POST /auth/logout`) — bumps `token_version` and clears the refresh cookie. Client cannot delete httpOnly cookies alone.
+- **C4** Short-lived access (~15m) + longer-lived refresh (~7d). Separate JWT secrets. Refresh rotates both tokens.
+- **C5** Never put secrets, passwords, or raw tokens in source, logs, or client bundles. Use `server/src/config/env.ts` / `client/src/config/env.ts`.
+- **C6** All authorization is server-side (`authenticate` + `authorize`). Client `RoleRoute` / nav filters are UX only.
+- **C7** Sanitize any user/API HTML before `dangerouslySetInnerHTML`. Prefer MUI text nodes; avoid raw HTML.

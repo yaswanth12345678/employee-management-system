@@ -1,4 +1,5 @@
 import { pool } from './pool';
+import { env } from '../config/env';
 import { hashPassword } from '../libs/password';
 import { logger } from '../libs/logger';
 
@@ -6,10 +7,10 @@ import { logger } from '../libs/logger';
  * Idempotent development seed: creates a first admin user + employee profile so you can log in.
  * Runs in a transaction. Safe to run repeatedly — it skips if the admin already exists.
  *
- * Override the defaults with SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD in your environment.
+ * Override defaults via SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD (validated in config/env.ts).
  */
-const ADMIN_EMAIL = process.env.SEED_ADMIN_EMAIL ?? 'admin@ems.local';
-const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD ?? 'Admin@12345';
+const ADMIN_EMAIL = env.SEED_ADMIN_EMAIL;
+const ADMIN_PASSWORD = env.SEED_ADMIN_PASSWORD;
 
 async function seed(): Promise<void> {
   const client = await pool.connect();
@@ -50,7 +51,8 @@ async function seed(): Promise<void> {
     ]);
 
     await client.query('COMMIT');
-    logger.info(`Seeded admin user → email: ${ADMIN_EMAIL}  password: ${ADMIN_PASSWORD}`);
+    // Never log the password — only confirm which account was created.
+    logger.info(`Seeded admin user → email: ${ADMIN_EMAIL}`);
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;
@@ -60,8 +62,8 @@ async function seed(): Promise<void> {
 }
 
 seed()
-  .then(() => pool.end())
+  .then(() => process.exit(0))
   .catch((err) => {
-    logger.error({ err }, 'Seed failed.');
-    void pool.end().finally(() => process.exit(1));
+    logger.error({ err }, 'Seed failed');
+    process.exit(1);
   });

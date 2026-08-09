@@ -1,0 +1,12 @@
+---
+description: Server environment and config access rules
+globs: server/**/*.{ts,js}
+alwaysApply: false
+---
+
+# Backend Env
+
+- **B1** Never read `process.env` outside `server/src/config/env.ts`. Import typed `env` everywhere else.
+  Exception: `server/test/setup.ts` may *assign* `process.env` before modules load (test bootstrap only).
+- **B2** Env is Zod-validated at boot (fail-fast). New keys: add to schema + `server/.env.example`.
+- Logging: `libs/logger` (pino). No `console.log` in request paths.

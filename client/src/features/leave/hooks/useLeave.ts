@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import type { LeaveRequestDTO, LeaveStatus, LeaveType } from '@ems/shared';
+import type { CreateLeaveRequest, LeaveRequestDTO, LeaveStatus, LeaveType } from '@ems/shared';
 import { usePaginatedList } from '../../../hooks/usePaginatedList';
 import * as leaveApi from '../api/leaveApi';
 
@@ -21,9 +21,63 @@ export function useLeave() {
   );
 
   const list = usePaginatedList<LeaveRequestDTO>(fetchPage);
-  const { resetPage } = list;
-  const changeStatus = useCallback((v: string) => { setStatus(v); resetPage(); }, [resetPage]);
-  const changeType = useCallback((v: string) => { setType(v); resetPage(); }, [resetPage]);
+  const { resetPage, refetch } = list;
+  const changeStatus = useCallback(
+    (v: string) => {
+      setStatus(v);
+      resetPage();
+    },
+    [resetPage],
+  );
+  const changeType = useCallback(
+    (v: string) => {
+      setType(v);
+      resetPage();
+    },
+    [resetPage],
+  );
 
-  return { ...list, status, type, setStatus: changeStatus, setType: changeType };
+  const apply = useCallback(
+    async (payload: CreateLeaveRequest) => {
+      await leaveApi.apply(payload);
+      await refetch();
+    },
+    [refetch],
+  );
+
+  const approve = useCallback(
+    async (id: string) => {
+      await leaveApi.approve(id);
+      await refetch();
+    },
+    [refetch],
+  );
+
+  const reject = useCallback(
+    async (id: string) => {
+      await leaveApi.reject(id);
+      await refetch();
+    },
+    [refetch],
+  );
+
+  const cancel = useCallback(
+    async (id: string) => {
+      await leaveApi.cancel(id);
+      await refetch();
+    },
+    [refetch],
+  );
+
+  return {
+    ...list,
+    status,
+    type,
+    setStatus: changeStatus,
+    setType: changeType,
+    apply,
+    approve,
+    reject,
+    cancel,
+  };
 }

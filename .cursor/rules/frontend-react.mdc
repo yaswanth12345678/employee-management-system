@@ -1,0 +1,15 @@
+---
+description: React, routing, and data-fetching patterns for the client
+globs: client/**/*.{tsx,ts}
+alwaysApply: false
+---
+
+# React Patterns
+
+- **S1** Mobile-friendly layouts with MUI breakpoints (`xs` up). Prefer progressive enhancement, not desktop-only UIs.
+- **S2** Named exports for pages/hooks/components. Feature `index.ts` re-exports the public surface.
+- **S3** Server data via feature `api/*` + hooks (`useEmployees`, etc.). No scattered `useEffect` + raw HTTP in pages.
+- **S4** Routes live in `client/src/app/router/AppRouter.tsx` (+ `config/routes.ts`). No ad-hoc route trees in features.
+- **S5** Forms: `react-hook-form` + Zod (`validation.ts`) + `@hookform/resolvers`.
+- **S6** Keep `ErrorBoundary` at app level; pages should render `ErrorState` / `EmptyState` / `PageLoader` for local failures.
+- **S7** Routed pages stay code-split with `React.lazy` + `Suspense` in `AppRouter`.

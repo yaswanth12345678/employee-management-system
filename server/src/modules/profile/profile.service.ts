@@ -1,6 +1,6 @@
 import type { EmployeeDTO } from '@ems/shared';
 import { NotFoundError, UnauthenticatedError, ValidationError } from '../../common/errors';
-import { findEmployeeIdByUserId } from '../../common/db/employees';
+import { findEmployeeIdByUserId } from '../employees/employees.repository';
 import { hashPassword, verifyPassword } from '../../libs/password';
 import { bumpTokenVersion } from '../auth/auth.repository';
 import * as employeesService from '../employees/employees.service';

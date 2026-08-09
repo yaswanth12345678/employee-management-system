@@ -1,16 +1,20 @@
-import { useEffect, useState } from 'react';
-import { Box, FormControlLabel, MenuItem, Paper, Stack, Switch, TextField } from '@mui/material';
-import type { ThemePreference, UserSettingsDTO } from '@ems/shared';
+import { useEffect } from 'react';
+import { Controller, useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Box, FormControlLabel, Paper, Stack, Switch } from '@mui/material';
+import type { ThemePreference } from '@ems/shared';
 import type { NormalizedError } from '../../../lib/http';
 import { PageHeader } from '../../../components/layout/PageHeader';
 import { Button } from '../../../components/ui/Button';
+import { FormTextField } from '../../../components/forms/FormTextField';
 import { PageLoader } from '../../../components/feedback/PageLoader';
 import { ErrorState } from '../../../components/feedback/ErrorState';
 import { useSnackbar } from '../../../contexts/SnackbarContext';
 import { useColorMode } from '../../../theme/ColorModeProvider';
-import * as settingsApi from '../api/settingsApi';
+import { useSettings } from '../hooks/useSettings';
+import { settingsFormSchema, type SettingsFormValues } from '../validation';
 
-const THEMES: { value: ThemePreference; label: string }[] = [
+const THEME_OPTIONS: { value: ThemePreference; label: string }[] = [
   { value: 'system', label: 'System' },
   { value: 'light', label: 'Light' },
   { value: 'dark', label: 'Dark' },
@@ -19,103 +23,109 @@ const THEMES: { value: ThemePreference; label: string }[] = [
 export function SettingsPage() {
   const { notify } = useSnackbar();
   const { setMode, previewMode, revertToStored } = useColorMode();
-  const [settings, setSettings] = useState<UserSettingsDTO | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  const { settings, loadError, loading, saving, refetch, save } = useSettings();
 
-  const load = async () => {
-    try {
-      const data = await settingsApi.get();
-      setSettings(data);
-      setMode(data.theme); // apply + persist the saved theme
-    } catch (err) {
-      setLoadError((err as NormalizedError).message);
-    }
-  };
+  const { control, handleSubmit, reset, watch } = useForm<SettingsFormValues>({
+    resolver: zodResolver(settingsFormSchema),
+    defaultValues: {
+      theme: 'system',
+      locale: 'en',
+      emailNotifications: true,
+      inAppNotifications: true,
+    },
+  });
 
   useEffect(() => {
-    void load();
-    // Discard any unsaved live-preview theme when leaving the page, so previewing Dark then
-    // navigating away without saving doesn't persist Dark app-wide across reloads.
+    if (!settings) return;
+    reset({
+      theme: settings.theme,
+      locale: settings.locale,
+      emailNotifications: settings.emailNotifications,
+      inAppNotifications: settings.inAppNotifications,
+    });
+    setMode(settings.theme);
+  }, [settings, reset, setMode]);
+
+  useEffect(() => {
+    // Discard any unsaved live-preview theme when leaving the page.
     return () => revertToStored();
   }, [revertToStored]);
 
-  const handleSave = async () => {
-    if (!settings) return;
-    setSaving(true);
+  // Live preview theme changes without persisting until Save.
+  const themeValue = watch('theme');
+  useEffect(() => {
+    if (settings) previewMode(themeValue);
+  }, [themeValue, previewMode, settings]);
+
+  const onSubmit = async (values: SettingsFormValues) => {
     try {
-      const saved = await settingsApi.update(settings);
-      setSettings(saved);
-      setMode(saved.theme); // now persist the previewed theme
+      const saved = await save(values);
+      setMode(saved.theme);
       notify('Settings saved', 'success');
     } catch (err) {
       notify((err as NormalizedError).message, 'error');
-    } finally {
-      setSaving(false);
     }
   };
 
-  if (loadError) return <ErrorState message={loadError} onRetry={load} />;
-  if (!settings) return <PageLoader />;
-
-  const patch = (fields: Partial<UserSettingsDTO>) => setSettings({ ...settings, ...fields });
+  if (loadError) return <ErrorState message={loadError} onRetry={refetch} />;
+  if (loading || !settings) return <PageLoader />;
 
   return (
     <>
       <PageHeader title="Settings" subtitle="Manage your preferences" />
 
       <Paper variant="outlined" sx={{ p: 3, maxWidth: 480 }}>
-        <Stack spacing={2.5}>
-          <TextField
-            select
-            label="Theme"
-            value={settings.theme}
-            onChange={(e) => {
-              const next = e.target.value as ThemePreference;
-              patch({ theme: next });
-              previewMode(next); // live, revertible preview (not persisted until Save)
-            }}
-            fullWidth
-          >
-            {THEMES.map((t) => (
-              <MenuItem key={t.value} value={t.value}>
-                {t.label}
-              </MenuItem>
-            ))}
-          </TextField>
+        <Box component="form" onSubmit={handleSubmit(onSubmit)} noValidate>
+          <Stack spacing={2.5}>
+            <FormTextField
+              control={control}
+              name="theme"
+              label="Theme"
+              select
+              options={THEME_OPTIONS}
+              fullWidth
+            />
 
-          <TextField
-            label="Locale"
-            value={settings.locale}
-            onChange={(e) => patch({ locale: e.target.value })}
-            fullWidth
-          />
+            <FormTextField control={control} name="locale" label="Locale" fullWidth />
 
-          <FormControlLabel
-            control={
-              <Switch
-                checked={settings.emailNotifications}
-                onChange={(e) => patch({ emailNotifications: e.target.checked })}
-              />
-            }
-            label="Email notifications"
-          />
-          <FormControlLabel
-            control={
-              <Switch
-                checked={settings.inAppNotifications}
-                onChange={(e) => patch({ inAppNotifications: e.target.checked })}
-              />
-            }
-            label="In-app notifications"
-          />
+            <Controller
+              control={control}
+              name="emailNotifications"
+              render={({ field }) => (
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={field.value}
+                      onChange={(_, checked) => field.onChange(checked)}
+                    />
+                  }
+                  label="Email notifications"
+                />
+              )}
+            />
+            <Controller
+              control={control}
+              name="inAppNotifications"
+              render={({ field }) => (
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={field.value}
+                      onChange={(_, checked) => field.onChange(checked)}
+                    />
+                  }
+                  label="In-app notifications"
+                />
+              )}
+            />
 
-          <Box>
-            <Button variant="contained" onClick={handleSave} loading={saving}>
-              Save settings
-            </Button>
-          </Box>
-        </Stack>
+            <Box>
+              <Button type="submit" variant="contained" loading={saving}>
+                Save settings
+              </Button>
+            </Box>
+          </Stack>
+        </Box>
       </Paper>
     </>
   );

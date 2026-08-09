@@ -15,3 +15,10 @@ export const projectFormSchema = z.object({
 });
 
 export type ProjectFormValues = z.infer<typeof projectFormSchema>;
+
+export const projectMemberSchema = z.object({
+  employeeId: z.string().min(1, 'Employee is required'),
+  roleOnProject: z.string().trim().max(80).optional(),
+});
+
+export type ProjectMemberValues = z.infer<typeof projectMemberSchema>;

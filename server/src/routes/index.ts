@@ -12,6 +12,7 @@ import { reportsRouter } from '../modules/reports';
 import { profileRouter } from '../modules/profile';
 import { settingsRouter } from '../modules/settings';
 import { dashboardRouter } from '../modules/dashboard';
+import { chatRouter } from '../modules/chat';
 
 /**
  * The API v1 root router. Every feature module's router is mounted here under its own
@@ -32,3 +33,4 @@ apiRouter.use('/reports', reportsRouter);
 apiRouter.use('/profile', profileRouter);
 apiRouter.use('/settings', settingsRouter);
 apiRouter.use('/dashboard', dashboardRouter);
+apiRouter.use('/chat', chatRouter);

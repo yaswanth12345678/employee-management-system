@@ -30,6 +30,7 @@ import type { RoleName } from '@ems/shared';
 import { ROUTES } from '../../config/routes';
 import { useAuth } from '../../contexts/AuthContext';
 import { NotificationsBell } from '../../features/notifications';
+import { ChatBell, ChatDrawer } from '../../features/chat';
 
 const DRAWER_WIDTH = 240;
 
@@ -114,6 +115,7 @@ export function AppLayout() {
           <Typography variant="h6" noWrap sx={{ flexGrow: 1 }}>
             Employee &amp; Project Management
           </Typography>
+          <ChatBell />
           <NotificationsBell />
           <Tooltip title={`${displayName} — profile`}>
             <IconButton onClick={() => navigate(ROUTES.profile)} sx={{ p: 0.5 }} aria-label="profile">
@@ -129,6 +131,8 @@ export function AppLayout() {
           </Tooltip>
         </Toolbar>
       </AppBar>
+
+      <ChatDrawer />
 
       <Box component="nav" sx={{ width: { sm: DRAWER_WIDTH }, flexShrink: { sm: 0 } }}>
         {/* Mobile: temporary drawer */}

@@ -23,6 +23,11 @@ export async function list(params: ListParams): Promise<PaginatedResponse<Employ
   return data;
 }
 
+export async function getById(id: string): Promise<EmployeeDTO> {
+  const { data } = await httpClient.get<ApiResponse<EmployeeDTO>>(`/employees/${id}`);
+  return data.data;
+}
+
 export async function create(payload: CreateEmployeeRequest): Promise<EmployeeDTO> {
   const { data } = await httpClient.post<ApiResponse<EmployeeDTO>>('/employees', payload);
   return data.data;

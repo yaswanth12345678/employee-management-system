@@ -5,6 +5,7 @@ import { ErrorBoundary } from '../ErrorBoundary';
 import { AuthProvider } from '../../contexts/AuthContext';
 import { SnackbarProvider } from '../../contexts/SnackbarContext';
 import { NotificationsBadgeProvider } from '../../features/notifications';
+import { ChatProvider } from '../../features/chat';
 import { RealtimeProvider } from '../../lib/realtime/RealtimeProvider';
 
 /**
@@ -19,6 +20,7 @@ import { RealtimeProvider } from '../../lib/realtime/RealtimeProvider';
  *   RealtimeProvider           → opens the WebSocket once authenticated
  *   SnackbarProvider           → toasts (any page can trigger)
  *   NotificationsBadgeProvider → shared unread count for the bell + notifications page
+ *   ChatProvider               → chat drawer + unread badge for peer messaging
  */
 export function AppProviders({ children }: { children: ReactNode }) {
   return (
@@ -28,7 +30,9 @@ export function AppProviders({ children }: { children: ReactNode }) {
           <AuthProvider>
             <RealtimeProvider>
               <SnackbarProvider>
-                <NotificationsBadgeProvider>{children}</NotificationsBadgeProvider>
+                <NotificationsBadgeProvider>
+                  <ChatProvider>{children}</ChatProvider>
+                </NotificationsBadgeProvider>
               </SnackbarProvider>
             </RealtimeProvider>
           </AuthProvider>

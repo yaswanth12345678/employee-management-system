@@ -33,6 +33,9 @@ const DepartmentsPage = lazy(() =>
 const EmployeesPage = lazy(() =>
   import('../../features/employees').then((m) => ({ default: m.EmployeesPage })),
 );
+const EmployeeQrPage = lazy(() =>
+  import('../../features/employees').then((m) => ({ default: m.EmployeeQrPage })),
+);
 const ProjectsPage = lazy(() =>
   import('../../features/projects').then((m) => ({ default: m.ProjectsPage })),
 );
@@ -75,6 +78,7 @@ export function AppRouter() {
             <Route path={ROUTES.dashboard} element={<DashboardPage />} />
             <Route path={ROUTES.departments} element={<DepartmentsPage />} />
             <Route path={ROUTES.employees} element={<EmployeesPage />} />
+            <Route path={ROUTES.employeeQr} element={<EmployeeQrPage />} />
             <Route path={ROUTES.projects} element={<ProjectsPage />} />
             <Route path={ROUTES.tasks} element={<TasksPage />} />
             <Route path={ROUTES.leave} element={<LeavePage />} />

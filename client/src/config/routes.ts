@@ -9,6 +9,7 @@ export const ROUTES = {
   dashboard: '/dashboard',
   departments: '/departments',
   employees: '/employees',
+  employeeQr: '/employees/qr/:id',
   projects: '/projects',
   tasks: '/tasks',
   leave: '/leave',

@@ -20,9 +20,16 @@ interface ListState<T> {
  * its own filters — that returns one page of rows plus the total; when a filter changes, that
  * closure changes (triggering a re-fetch) and the hook should call `resetPage()` to restart at 1.
  */
-export function usePaginatedList<T>(fetchPage: (page: number, limit: number) => Promise<Page<T>>) {
+interface UsePaginatedListOptions {
+  initialLimit?: number;
+}
+
+export function usePaginatedList<T>(
+  fetchPage: (page: number, limit: number) => Promise<Page<T>>,
+  options?: UsePaginatedListOptions,
+) {
   const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(10);
+  const [limit, setLimit] = useState(options?.initialLimit ?? 10);
   const [state, setState] = useState<ListState<T>>({ data: [], total: 0, loading: true, error: null });
 
   const refetch = useCallback(

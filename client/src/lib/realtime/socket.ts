@@ -1,4 +1,4 @@
-import type { NotificationDTO } from '@ems/shared';
+import type { ChatMessageDTO, NotificationDTO } from '@ems/shared';
 import { env } from '../../config/env';
 import { getAccessToken } from '../http';
 
@@ -11,7 +11,8 @@ import { getAccessToken } from '../http';
 export type RealtimeMessage =
   | { type: 'connected' }
   | { type: 'notification'; notification: NotificationDTO }
-  | { type: 'task_updated'; taskId: string; status: string };
+  | { type: 'task_updated'; taskId: string; status: string }
+  | { type: 'chat_message'; message: ChatMessageDTO; conversationId: string };
 
 type Handler = (message: RealtimeMessage) => void;
 

@@ -8,6 +8,7 @@ export * from './task';
 export * from './leave';
 export * from './attendance';
 export * from './notification';
+export * from './chat';
 export * from './report';
 export * from './settings';
 export * from './dashboard';

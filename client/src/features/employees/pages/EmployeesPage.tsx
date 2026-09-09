@@ -1,19 +1,28 @@
-import { Avatar, Box, IconButton, MenuItem, Stack, TextField, Tooltip, Typography } from '@mui/material';
+import { useState, type ReactNode } from 'react';
+import {
+  IconButton,
+  MenuItem,
+  Stack,
+  TextField,
+  Tooltip,
+} from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/DeleteOutline';
+import QrCode2Icon from '@mui/icons-material/QrCode2';
 import type { EmployeeDTO } from '@ems/shared';
 import { PageHeader } from '../../../components/layout/PageHeader';
 import { Button } from '../../../components/ui/Button';
 import { SearchBar } from '../../../components/ui/SearchBar';
-import { DataTable, type Column } from '../../../components/ui/DataTable';
 import { ConfirmDialog } from '../../../components/feedback/ConfirmDialog';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useCrudPage } from '../../../hooks/useCrudPage';
 import { useDepartmentOptions } from '../../departments';
 import { useEmployees } from '../hooks/useEmployees';
+import { EmployeeCard } from '../components/EmployeeCard';
+import { EmployeeFeed, type FeedOrientation } from '../components/EmployeeFeed';
 import { EmployeeFormDialog } from '../components/EmployeeFormDialog';
-import { StatusChip } from '../components/StatusChip';
+import { EmployeeQrDialog } from '../components/EmployeeQrDialog';
 import type { EmployeeFormValues } from '../validation';
 import * as employeesApi from '../api/employeesApi';
 
@@ -24,15 +33,19 @@ const STATUS_FILTERS = [
   { value: 'terminated', label: 'Terminated' },
 ];
 
+const CARD_ROW_HEIGHT = 200;
+const CARD_COLUMN_WIDTH = 280;
+
 export function EmployeesPage() {
   const { user } = useAuth();
   const emp = useEmployees();
   const { options: departments } = useDepartmentOptions();
+  const [orientation, setOrientation] = useState<FeedOrientation>('vertical');
+  const [qrEmployee, setQrEmployee] = useState<EmployeeDTO | null>(null);
 
   const crud = useCrudPage<EmployeeDTO, EmployeeFormValues>({
     entityName: 'Employee',
     list: { data: emp.data, page: emp.page, setPage: emp.setPage, refetch: emp.refetch },
-    // Create sends credentials + role; edit sends only the mutable profile fields.
     create: (v) =>
       employeesApi.create({
         email: v.email,
@@ -61,38 +74,41 @@ export function EmployeesPage() {
 
   const canWrite = user?.role === 'admin' || user?.role === 'hr';
   const canDelete = user?.role === 'admin';
+  const horizontal = orientation === 'horizontal';
 
-  const columns: Column<EmployeeDTO>[] = [
-    {
-      key: 'name',
-      header: 'Employee',
-      render: (e) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <Avatar src={e.avatarUrl} sx={{ width: 32, height: 32 }}>
-            {e.firstName.charAt(0)}
-          </Avatar>
-          <Box>
-            <Typography variant="body2" fontWeight={600}>
-              {e.firstName} {e.lastName}
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              {e.employeeCode}
-            </Typography>
-          </Box>
-        </Box>
-      ),
-    },
-    { key: 'email', header: 'Email', render: (e) => e.email },
-    { key: 'role', header: 'Role', render: (e) => e.role },
-    { key: 'department', header: 'Department', render: (e) => e.department?.name ?? '—' },
-    { key: 'status', header: 'Status', render: (e) => <StatusChip status={e.status} /> },
-  ];
+  const cardActions = (e: EmployeeDTO): ReactNode => (
+    <Stack direction="row" spacing={0.5}>
+      <Tooltip title="QR code">
+        <IconButton size="small" onClick={() => setQrEmployee(e)} aria-label="show employee QR">
+          <QrCode2Icon fontSize="small" />
+        </IconButton>
+      </Tooltip>
+      {canWrite && (
+        <Tooltip title="Edit">
+          <IconButton size="small" onClick={() => crud.openEdit(e)}>
+            <EditIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+      )}
+      {canDelete && (
+        <Tooltip title="Delete">
+          <IconButton size="small" color="error" onClick={() => crud.requestDelete(e)}>
+            <DeleteIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+      )}
+    </Stack>
+  );
 
   return (
     <>
       <PageHeader
         title="Employees"
-        subtitle="Manage your organization's people"
+        subtitle={
+          horizontal
+            ? 'Swipe sideways — more people load as you go'
+            : 'Scroll the feed — more people load as you go'
+        }
         action={
           canWrite ? (
             <Button variant="contained" startIcon={<AddIcon />} onClick={crud.openCreate}>
@@ -102,7 +118,16 @@ export function EmployeesPage() {
         }
       />
 
-      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 2 }}>
+      <Stack
+        direction={{ xs: 'column', sm: 'row' }}
+        spacing={2}
+        sx={{
+          mb: 2,
+          maxWidth: horizontal ? '100%' : 480,
+          mx: horizontal ? 0 : 'auto',
+          width: '100%',
+        }}
+      >
         <SearchBar placeholder="Search employees…" onSearch={emp.setSearch} />
         <TextField
           select
@@ -110,7 +135,7 @@ export function EmployeesPage() {
           label="Department"
           value={emp.departmentId}
           onChange={(e) => emp.setDepartmentId(e.target.value)}
-          sx={{ minWidth: 180 }}
+          sx={{ minWidth: 160 }}
           InputLabelProps={{ shrink: true }}
         >
           <MenuItem value="">All departments</MenuItem>
@@ -126,7 +151,7 @@ export function EmployeesPage() {
           label="Status"
           value={emp.status}
           onChange={(e) => emp.setStatus(e.target.value)}
-          sx={{ minWidth: 160 }}
+          sx={{ minWidth: 140 }}
           InputLabelProps={{ shrink: true }}
         >
           <MenuItem value="">All statuses</MenuItem>
@@ -136,44 +161,37 @@ export function EmployeesPage() {
             </MenuItem>
           ))}
         </TextField>
+        <TextField
+          select
+          size="small"
+          label="Scroll"
+          value={orientation}
+          onChange={(e) => setOrientation(e.target.value as FeedOrientation)}
+          sx={{ minWidth: 140 }}
+          InputLabelProps={{ shrink: true }}
+        >
+          <MenuItem value="vertical">Vertical</MenuItem>
+          <MenuItem value="horizontal">Horizontal</MenuItem>
+        </TextField>
       </Stack>
 
-      <DataTable
-        columns={columns}
+      <EmployeeFeed
         rows={emp.data}
         getRowId={(e) => e.id}
         loading={emp.loading}
+        loadingMore={emp.loadingMore}
+        hasMore={emp.hasMore}
         error={emp.error}
         onRetry={emp.refetch}
+        onNearEnd={emp.loadMore}
+        resetKey={emp.feedKey}
+        orientation={orientation}
         emptyTitle="No employees found"
         emptyDescription={canWrite ? 'Add your first employee to get started.' : undefined}
-        page={emp.page}
-        limit={emp.limit}
-        total={emp.total}
-        onPageChange={emp.setPage}
-        onLimitChange={emp.setLimit}
-        rowActions={
-          canWrite || canDelete
-            ? (e) => (
-                <>
-                  {canWrite && (
-                    <Tooltip title="Edit">
-                      <IconButton size="small" onClick={() => crud.openEdit(e)}>
-                        <EditIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                  )}
-                  {canDelete && (
-                    <Tooltip title="Delete">
-                      <IconButton size="small" color="error" onClick={() => crud.requestDelete(e)}>
-                        <DeleteIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                  )}
-                </>
-              )
-            : undefined
-        }
+        maxHeight={720}
+        itemSize={horizontal ? CARD_COLUMN_WIDTH : CARD_ROW_HEIGHT}
+        columnWidth={CARD_COLUMN_WIDTH}
+        renderCard={(e) => <EmployeeCard employee={e} actions={cardActions(e)} />}
       />
 
       <EmployeeFormDialog
@@ -182,6 +200,12 @@ export function EmployeesPage() {
         submitting={crud.submitting}
         onClose={crud.closeForm}
         onSubmit={crud.submit}
+      />
+
+      <EmployeeQrDialog
+        employee={qrEmployee}
+        open={Boolean(qrEmployee)}
+        onClose={() => setQrEmployee(null)}
       />
 
       <ConfirmDialog

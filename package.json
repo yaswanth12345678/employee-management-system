@@ -12,8 +12,6 @@
     "dev:client": "npm --prefix client run dev",
     "dev": "concurrently -n server,client -c blue,green \"npm:dev:server\" \"npm:dev:client\"",
     "build": "npm --prefix shared run build && npm --prefix server run build && npm --prefix client run build",
-    "migrate": "npm --prefix server run migrate",
-    "seed":"npm --prefix server run seed",
     "typecheck": "npm --prefix server run typecheck && npm --prefix client run typecheck",
     "test": "npm --prefix server run test && npm --prefix client run test",
     "lint": "eslint .",

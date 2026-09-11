@@ -3,7 +3,7 @@
 #   → client  http://localhost:8080
 #   → API     http://localhost:4000/api/v1
 #   → docs    http://localhost:4000/api/docs
-# The server auto-migrates + seeds (admin@ems.local / Admin@12345) on start.
+# db-init applies server/db/migrations/schema.sql once on a fresh database.
 
 services:
   db:
@@ -20,6 +20,23 @@ services:
       interval: 5s
       timeout: 5s
       retries: 12
+
+  db-init:
+    image: postgres:16-alpine
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./server/db/migrations/schema.sql:/schema.sql:ro
+    environment:
+      PGPASSWORD: postgres
+    entrypoint: ['/bin/sh', '-c']
+    command:
+      - |
+        psql -h db -U postgres -d ems -tAc "SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='roles'" | grep -q 1 \
+          && echo "Schema already present — skipping init" \
+          || psql -h db -U postgres -d ems -v ON_ERROR_STOP=1 -f /schema.sql
+    restart: 'no'
 
   server:
     build:
@@ -38,8 +55,8 @@ services:
     ports:
       - '4000:4000'
     depends_on:
-      db:
-        condition: service_healthy
+      db-init:
+        condition: service_completed_successfully
 
   client:
     build:

@@ -59,7 +59,7 @@ cd employee-management-system
 docker compose up --build
 ```
 
-Wait until all services are healthy. The API auto-migrates and seeds on startup.
+Wait until all services are healthy. On a fresh database, `db-init` applies `server/db/migrations/schema.sql` automatically.
 
 | Service | URL |
 |---|---|
@@ -131,16 +131,23 @@ Edit `server/.env`:
 
 `client/.env` can stay at the default (`VITE_API_URL=http://localhost:4000/api/v1`).
 
-### 4. Build shared types, migrate, seed
+### 4. Create the database and apply schema
+
+Create an empty Postgres database (e.g. `ems`), then apply the schema once:
 
 ```bash
 npm run build:shared
-npm run migrate
-npm run seed
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f server/db/migrations/schema.sql
 ```
 
-- **`migrate`** applies `server/db/migrations/*.sql` in order (safe to re-run; already-applied files are skipped).
-- **`seed`** creates the default admin user (idempotent — skips if the admin already exists).
+On Windows (PowerShell), if `psql` is on your PATH:
+
+```powershell
+psql $env:DATABASE_URL -v ON_ERROR_STOP=1 -f server/db/migrations/schema.sql
+```
+
+This creates all tables, roles, and the default admin user (`admin@ems.local` / `Admin@12345`).
+To reset: drop and recreate the database, then run the command again.
 
 ### 5. Start dev servers
 
@@ -174,7 +181,6 @@ Log in with `admin@ems.local` / `Admin@12345`.
 | `CORS_ORIGIN` | Allowed browser origin | `http://localhost:5173` (dev) or `http://localhost:8080` (Docker client) |
 | `PUBLIC_URL` | Base URL for avatar upload links | `http://localhost:4000` |
 | `LOG_LEVEL` | Pino log level | `info` |
-| `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` | First admin user (seed only) | `admin@ems.local` / `Admin@12345` |
 
 **`client/.env`** (copy from `client/.env.example`):
 
@@ -193,8 +199,6 @@ Log in with `admin@ems.local` / `Admin@12345`.
 | `npm run dev` | Start **API (:4000) + client (:5173)** together in watch mode |
 | `npm run build` | Build `shared` → compile `server` → bundle `client` |
 | `npm run build:shared` | Build only the shared type contract |
-| `npm run migrate` | Apply pending SQL migrations (transactional) |
-| `npm run seed` | Seed the default admin user (idempotent) |
 | `npm run typecheck` | Type-check server + client (no emit) |
 | `npm run test` | Run server + client test suites |
 | `npm run lint` | ESLint over the whole repo |
@@ -229,30 +233,19 @@ npm --prefix client run dev -- --host
 Then use your PC’s LAN IP in the QR link (e.g. `http://192.168.1.10:5173/employees/qr/<id>`), and ensure
 `CORS_ORIGIN` in `server/.env` allows that origin if needed.
 
-**Chat:** requires migration `004_chat.sql`. If chat APIs return 500, run `npm run migrate` again on a
-fresh or up-to-date database.
-
 ---
 
 ## Troubleshooting
 
-### `npm run migrate` fails on a database that already has tables
+### Schema / login issues after changing the database
 
-Migrations are tracked in `schema_migrations`. If the DB was created manually (tables exist but no
-migration history), either:
+Drop and recreate the database, then re-apply the schema:
 
-1. **Fresh start (dev only):** drop and recreate the database, then `npm run migrate && npm run seed`, or  
-2. **Mark prior migrations as applied** (if schema already matches), then run migrate for new files only:
-
-```sql
-INSERT INTO schema_migrations (filename) VALUES
-  ('001_init.sql'),
-  ('002_employee_code_seq.sql'),
-  ('003_token_version.sql')
-ON CONFLICT DO NOTHING;
+```bash
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f server/db/migrations/schema.sql
 ```
 
-Then run `npm run migrate` again for any pending files (e.g. `004_chat.sql`).
+Default login: `admin@ems.local` / `Admin@12345` (created by the schema file).
 
 ### API won’t start — `DATABASE_URL` / connection refused
 
@@ -279,11 +272,6 @@ Re-run after pulling changes that touch `shared/`.
 - API default: `4000` — change `PORT` in `server/.env` and update `VITE_API_URL` / `CORS_ORIGIN` accordingly.
 - Client default: `5173` — Vite will suggest another port if busy.
 - Docker Postgres: `5432` — stop a local Postgres instance or change the compose port mapping.
-
-### Login fails after seed
-
-- Re-run `npm run seed` (idempotent).
-- Or set `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` in `server/.env` **before** seeding on a fresh DB.
 
 ---
 

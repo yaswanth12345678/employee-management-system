@@ -1,10 +1,11 @@
 -- =========================================================================
--- 001_init · Enterprise Employee & Project Management System — initial schema
--- Target: PostgreSQL 14+  ·  Normal form: 3NF
+-- EMS database schema (PostgreSQL 14+)
+-- Apply once on an empty database:
+--   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f server/db/migrations/schema.sql
 -- =========================================================================
 
 -- ── Extensions & shared helpers ─────────────────────────────────────────
-CREATE EXTENSION IF NOT EXISTS pgcrypto;   -- gen_random_uuid()
+CREATE EXTENSION IF NOT EXISTS pgcrypto;   -- gen_random_uuid(), crypt()
 CREATE EXTENSION IF NOT EXISTS citext;     -- case-insensitive email
 
 CREATE OR REPLACE FUNCTION set_updated_at()
@@ -41,6 +42,7 @@ CREATE TABLE users (
   password_hash TEXT   NOT NULL,
   role_id       UUID   NOT NULL REFERENCES roles(id) ON DELETE RESTRICT,
   is_active     BOOLEAN NOT NULL DEFAULT TRUE,
+  token_version INTEGER NOT NULL DEFAULT 0,
   last_login_at TIMESTAMPTZ,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -79,6 +81,9 @@ CREATE TABLE employees (
 CREATE INDEX idx_employees_department_id ON employees(department_id);
 CREATE INDEX idx_employees_manager_id    ON employees(manager_id);
 CREATE INDEX idx_employees_status        ON employees(status);
+
+-- Sequence for auto-generating employee codes (EMP-00002, …). Admin keeps EMP-00001.
+CREATE SEQUENCE employee_code_seq START WITH 2 INCREMENT BY 1;
 
 -- Resolve the circular dependency: departments.head_id -> employees.id
 ALTER TABLE departments
@@ -210,7 +215,7 @@ CREATE INDEX idx_notifications_user_all
 CREATE TABLE password_reset_tokens (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  token_hash TEXT NOT NULL,               -- store a HASH of the token, never the token itself
+  token_hash TEXT NOT NULL,
   expires_at TIMESTAMPTZ NOT NULL,
   used_at    TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -229,21 +234,60 @@ CREATE TABLE user_settings (
   CONSTRAINT chk_theme CHECK (theme IN ('light','dark','system'))
 );
 
--- ── updated_at triggers ──────────────────────────────────────────────────
-CREATE TRIGGER trg_users_updated         BEFORE UPDATE ON users          FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-CREATE TRIGGER trg_departments_updated    BEFORE UPDATE ON departments    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-CREATE TRIGGER trg_employees_updated      BEFORE UPDATE ON employees      FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-CREATE TRIGGER trg_projects_updated       BEFORE UPDATE ON projects       FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-CREATE TRIGGER trg_tasks_updated          BEFORE UPDATE ON tasks          FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-CREATE TRIGGER trg_comments_updated       BEFORE UPDATE ON comments       FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-CREATE TRIGGER trg_attendance_updated     BEFORE UPDATE ON attendance     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-CREATE TRIGGER trg_leave_requests_updated BEFORE UPDATE ON leave_requests FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-CREATE TRIGGER trg_user_settings_updated  BEFORE UPDATE ON user_settings  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+-- ── chat (direct-message conversations between users) ────────────────────
+CREATE TABLE chat_conversations (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_low   UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  user_high  UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT chk_chat_pair CHECK (user_low < user_high),
+  CONSTRAINT uq_chat_pair UNIQUE (user_low, user_high)
+);
+CREATE INDEX idx_chat_conversations_updated ON chat_conversations(updated_at DESC);
 
--- ── seed reference data: roles ───────────────────────────────────────────
+CREATE TABLE chat_messages (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  conversation_id UUID NOT NULL REFERENCES chat_conversations(id) ON DELETE CASCADE,
+  sender_id       UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  body            TEXT NOT NULL CHECK (char_length(trim(body)) BETWEEN 1 AND 4000),
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  read_at         TIMESTAMPTZ
+);
+CREATE INDEX idx_chat_messages_conversation ON chat_messages(conversation_id, created_at DESC);
+CREATE INDEX idx_chat_messages_unread ON chat_messages(conversation_id, sender_id)
+  WHERE read_at IS NULL;
+
+-- ── updated_at triggers ──────────────────────────────────────────────────
+CREATE TRIGGER trg_users_updated              BEFORE UPDATE ON users              FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE TRIGGER trg_departments_updated        BEFORE UPDATE ON departments        FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE TRIGGER trg_employees_updated          BEFORE UPDATE ON employees          FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE TRIGGER trg_projects_updated           BEFORE UPDATE ON projects           FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE TRIGGER trg_tasks_updated              BEFORE UPDATE ON tasks              FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE TRIGGER trg_comments_updated           BEFORE UPDATE ON comments           FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE TRIGGER trg_attendance_updated         BEFORE UPDATE ON attendance         FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE TRIGGER trg_leave_requests_updated     BEFORE UPDATE ON leave_requests     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE TRIGGER trg_user_settings_updated      BEFORE UPDATE ON user_settings       FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE TRIGGER trg_chat_conversations_updated   BEFORE UPDATE ON chat_conversations FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- ── seed reference data ──────────────────────────────────────────────────
 INSERT INTO roles (name, description) VALUES
   ('admin',    'Full system access'),
   ('hr',       'Manages employees, departments, and leave'),
   ('manager',  'Manages projects, tasks, and team approvals'),
-  ('employee', 'Standard employee access')
-ON CONFLICT (name) DO NOTHING;
+  ('employee', 'Standard employee access');
+
+-- Default admin: admin@ems.local / Admin@12345
+WITH admin_role AS (
+  SELECT id FROM roles WHERE name = 'admin'
+),
+new_user AS (
+  INSERT INTO users (email, password_hash, role_id)
+  SELECT 'admin@ems.local', crypt('Admin@12345', gen_salt('bf', 12)), id FROM admin_role
+  RETURNING id
+)
+INSERT INTO employees (user_id, employee_code, first_name, last_name, status, hire_date)
+SELECT id, 'EMP-00001', 'System', 'Administrator', 'active', CURRENT_DATE FROM new_user;
+
+INSERT INTO user_settings (user_id)
+SELECT id FROM users WHERE email = 'admin@ems.local';

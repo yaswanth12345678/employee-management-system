@@ -16,5 +16,4 @@ COPY --from=build /app/server ./server
 WORKDIR /app/server
 ENV NODE_ENV=production
 EXPOSE 4000
-# Migrate + seed (idempotent) then start. tsx is present from the install above.
-CMD ["sh", "-c", "npm run migrate && npm run seed && node dist/index.js"]
+CMD ["node", "dist/index.js"]
